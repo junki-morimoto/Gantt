@@ -3,58 +3,122 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>プロジェクト ガントチャート</title>
+  <title>PROJECT GANTT CHART</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f2f1; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; }
 
+    /* ─── ヘッダー ─── */
     #header {
-      background: #0078d4;
+      background: linear-gradient(135deg, #0078d4 0%, #106ebe 100%);
       color: white;
-      padding: 10px 16px;
+      padding: 0 16px;
       display: flex;
       align-items: center;
-      gap: 12px;
-      height: 46px;
+      gap: 10px;
+      height: 52px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+      position: relative;
+      z-index: 10;
     }
-    #header h1 { font-size: 15px; font-weight: 600; flex: 1; }
+    #header .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-right: 8px;
+    }
+    #header .logo i {
+      font-size: 20px;
+      opacity: 0.95;
+    }
+    #header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      flex: 1;
+      letter-spacing: 0.2px;
+    }
+    .divider {
+      width: 1px;
+      height: 24px;
+      background: rgba(255,255,255,0.3);
+      margin: 0 4px;
+    }
 
+    /* ─── タブボタン ─── */
+    .tab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      color: rgba(255,255,255,0.8);
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 0 12px;
+      height: 52px;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: all 0.15s;
+      border-radius: 0;
+    }
+    .tab-btn i { font-size: 15px; }
+    .tab-btn:hover {
+      color: white;
+      background: rgba(255,255,255,0.1);
+    }
+    .tab-btn.active {
+      color: white;
+      font-weight: 600;
+      border-bottom: 2px solid white;
+      background: rgba(255,255,255,0.1);
+    }
+
+    /* ─── アップロードボタン ─── */
     .btn-upload {
       display: inline-flex;
       align-items: center;
       gap: 6px;
       background: rgba(255,255,255,0.15);
       color: white;
-      border: 1px solid rgba(255,255,255,0.4);
-      padding: 5px 14px;
-      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.35);
+      padding: 6px 14px;
+      border-radius: 6px;
       cursor: pointer;
       font-size: 13px;
       font-family: inherit;
       white-space: nowrap;
+      transition: all 0.15s;
     }
-    .btn-upload:hover { background: rgba(255,255,255,0.25); }
+    .btn-upload i { font-size: 14px; }
+    .btn-upload:hover {
+      background: rgba(255,255,255,0.25);
+      border-color: rgba(255,255,255,0.6);
+    }
 
     #csvFile { display: none; }
 
     #fileName {
-      font-size: 12px;
-      opacity: 0.75;
-      max-width: 200px;
+      font-size: 11.5px;
+      opacity: 0.65;
+      max-width: 180px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
+    /* ─── ガントチャートエリア ─── */
     #vis {
       width: 100vw;
-      height: calc(100vh - 46px);
+      height: calc(100vh - 52px);
       overflow: hidden;
     }
 
+    /* ─── ローディング ─── */
     #loading {
       position: fixed;
       top: 50%;
@@ -64,100 +128,179 @@
       color: #666;
     }
     #loading .spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid #ddd;
+      width: 36px;
+      height: 36px;
+      border: 3px solid #e0e0e0;
       border-top-color: #0078d4;
       border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+      animation: spin 0.75s linear infinite;
       margin: 0 auto 12px;
     }
+    #loading p { font-size: 13px; color: #888; }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ─── タブ ─── */
-    .tab-btn {
-      background: rgba(255,255,255,0.15);
-      color: white;
-      border: 1px solid rgba(255,255,255,0.4);
-      padding: 5px 14px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 13px;
-      font-family: inherit;
-      white-space: nowrap;
-    }
-    .tab-btn:hover { background: rgba(255,255,255,0.25); }
-    .tab-btn.active {
-      background: white;
-      color: #0078d4;
-      font-weight: 600;
-    }
 
     /* ─── 作業量サマリー ─── */
     #summary {
       display: none;
-      padding: 24px;
-      height: calc(100vh - 46px);
+      padding: 28px 32px;
+      height: calc(100vh - 52px);
       overflow-y: auto;
-      background: #f3f2f1;
+      background: #f0f2f5;
     }
-    #summary h2 {
-      font-size: 16px;
-      color: #323130;
-      margin-bottom: 16px;
+    .summary-header {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 8px;
     }
-    .summary-table {
-      width: 100%;
-      max-width: 800px;
-      border-collapse: collapse;
+    .summary-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+    .summary-header .subtitle {
+      font-size: 12px;
+      color: #888;
+    }
+    .score-legend {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
       background: white;
-      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 11.5px;
+      color: #555;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* カードグリッド */
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+      max-width: 1100px;
+    }
+    .assignee-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
       overflow: hidden;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      transition: box-shadow 0.15s;
     }
-    .summary-table th {
-      background: #0078d4;
+    .assignee-card:hover {
+      box-shadow: 0 4px 16px rgba(0,120,212,0.13);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0078d4, #50a8f0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       color: white;
-      padding: 10px 16px;
-      text-align: left;
-      font-size: 13px;
+      font-size: 15px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .card-name {
+      font-size: 14px;
       font-weight: 600;
+      color: #1a1a2e;
+      flex: 1;
     }
-    .summary-table td {
-      padding: 10px 16px;
-      font-size: 13px;
-      border-bottom: 1px solid #edebe9;
-      color: #323130;
+    .card-score-badge {
+      background: #e8f0fe;
+      color: #0078d4;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
     }
-    .summary-table tr:last-child td { border-bottom: none; }
-    .summary-table tr:hover td { background: #f3f2f1; }
-    .score-bar-wrap {
+    .card-body { padding: 12px 16px 14px; }
+    .card-stat {
       display: flex;
       align-items: center;
       gap: 8px;
+      font-size: 12.5px;
+      color: #555;
+      margin-bottom: 10px;
     }
-    .score-bar {
-      height: 12px;
-      background: #0078d4;
+    .card-stat i { color: #0078d4; font-size: 14px; }
+    .bar-track {
+      background: #eef2f7;
       border-radius: 6px;
-      min-width: 4px;
-      transition: width 0.3s;
+      height: 8px;
+      overflow: hidden;
     }
-    .score-num { font-weight: 600; color: #0078d4; min-width: 28px; }
-    .score-note { font-size: 11px; color: #888; }
+    .bar-fill {
+      height: 100%;
+      border-radius: 6px;
+      background: linear-gradient(90deg, #0078d4, #50a8f0);
+      transition: width 0.4s ease;
+    }
+    .task-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 10px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      border: 1px solid;
+    }
+    .chip-vl { background:#f0faf2; color:#2e7d32; border-color:#a5d6a7; }
+    .chip-l  { background:#e8f5e9; color:#388e3c; border-color:#c8e6c9; }
+    .chip-m  { background:#fff8e1; color:#f57f17; border-color:#ffe082; }
+    .chip-h  { background:#fff3e0; color:#e65100; border-color:#ffcc80; }
+    .chip-vh { background:#fce4ec; color:#c62828; border-color:#f48fb1; }
   </style>
 </head>
 <body>
 
 <div id="header">
-  <h1>📊 プロジェクト ガントチャート</h1>
-  <button class="tab-btn active" id="tabGantt" onclick="showTab('gantt')">📅 ガントチャート</button>
-  <button class="tab-btn"        id="tabSummary" onclick="showTab('summary')">👤 作業量サマリー</button>
+  <div class="logo">
+    <i class="bi bi-diagram-3-fill"></i>
+  </div>
+  <h1>PROJECT GANTT</h1>
+  <div class="divider"></div>
+  <button class="tab-btn active" id="tabGantt" onclick="showTab('gantt')">
+    <i class="bi bi-bar-chart-gantt"></i> GANTT CHART
+  </button>
+  <button class="tab-btn" id="tabSummary" onclick="showTab('summary')">
+    <i class="bi bi-people-fill"></i> TASK SUMMARY
+  </button>
+  <div class="divider"></div>
   <label class="btn-upload" for="csvFile">
-    📂 CSVを読み込む
+    <i class="bi bi-upload"></i> LOAD CSV
   </label>
   <input type="file" id="csvFile" accept=".csv">
-  <span id="fileName">サンプルデータ表示中</span>
+  <span id="fileName"><i class="bi bi-info-circle" style="margin-right:3px;"></i>SMAPLE</span>
 </div>
 
 <div id="vis"></div>
@@ -165,7 +308,7 @@
 
 <div id="loading">
   <div class="spinner"></div>
-  <div>読み込み中...</div>
+  <p>読み込み中...</p>
 </div>
 
 
@@ -3514,53 +3657,71 @@
   }
 
   // ─── 作業量サマリー描画 ──────────────────────────────────────────────
+  const CHIP_CLASS = {
+    'very low':1, 'low':2, 'medium':3, 'midium':3, 'high':4, 'very high':5
+  };
+  const CHIP_LABEL = ['','VL','L','M','H','VH'];
+  const CHIP_CSS   = ['','chip-vl','chip-l','chip-m','chip-h','chip-vh'];
+  const CHIP_NAME  = ['','Very Low','Low','Medium','High','Very High'];
+
   function renderSummary(data) {
-    // マイルストーン行は除外、未完了（completion < 100）のみ集計
     const incomplete = data.filter(d => d.milestone !== true && (parseInt(d.completion) || 0) < 100);
 
-    // 担当者ごとに集計
     const map = {};
     incomplete.forEach(d => {
       const name = d.assignee || '(未設定)';
-      if (!map[name]) map[name] = { count: 0, score: 0 };
+      if (!map[name]) map[name] = { count: 0, score: 0, tasks: [] };
+      const s = getScore(d.status);
       map[name].count++;
-      map[name].score += getScore(d.status);
+      map[name].score += s;
+      map[name].tasks.push({ task: d.task, score: s, status: (d.status||'').toLowerCase().trim() });
     });
 
-    const rows = Object.entries(map).sort((a, b) => b[1].score - a[1].score);
-    const maxScore = rows.length ? rows[0][1].score : 1;
+    const entries = Object.entries(map).sort((a, b) => b[1].score - a[1].score);
+    const maxScore = entries.length ? entries[0][1].score : 1;
 
-    let html = `<h2>作業量サマリー <span style="font-size:12px;color:#888;font-weight:normal;">（未完了タスク × 難易度スコア）</span></h2>`;
-    html += `<p style="font-size:12px;color:#888;margin-bottom:16px;">
-      難易度スコア：Very Low=1 / Low=2 / Medium=3 / High=4 / Very High=5
-    </p>`;
+    let html = `
+      <div class="summary-header">
+        <h2><i class="bi bi-people-fill" style="color:#0078d4;margin-right:8px;"></i>作業量サマリー</h2>
+        <span class="subtitle">未完了タスク × 難易度スコア</span>
+      </div>
+`;
 
-    if (rows.length === 0) {
-      html += `<p style="color:#888;font-size:13px;">未完了タスクがありません。</p>`;
+    if (entries.length === 0) {
+      html += `<p style="color:#888;font-size:13px;"><i class="bi bi-check-circle" style="margin-right:6px;color:#43a047;"></i>未完了タスクがありません。</p>`;
     } else {
-      html += `<table class="summary-table">
-        <thead><tr>
-          <th>担当者</th>
-          <th>未完了タスク数</th>
-          <th>作業量スコア</th>
-        </tr></thead><tbody>`;
+      html += `<div class="summary-cards">`;
+      entries.forEach(([name, v]) => {
+        const pct = Math.round((v.score / maxScore) * 100);
+        const initial = name.charAt(0).toUpperCase();
 
-      rows.forEach(([name, v]) => {
-        const barWidth = Math.round((v.score / maxScore) * 200);
-        html += `<tr>
-          <td>${name}</td>
-          <td>${v.count} 件</td>
-          <td>
-            <div class="score-bar-wrap">
-              <div class="score-bar" style="width:${barWidth}px"></div>
-              <span class="score-num">${v.score}</span>
-              <span class="score-note">pt</span>
+        // タスクチップ
+        const chips = v.tasks.map(t => {
+          const rank = CHIP_CLASS[(t.status)] || 3;
+          return `<span class="chip ${CHIP_CSS[rank]}" title="${t.task}">
+            <i class="bi bi-tag-fill"></i>${CHIP_LABEL[rank]}
+          </span>`;
+        }).join('');
+
+        html += `
+          <div class="assignee-card">
+            <div class="card-header">
+              <div class="avatar">${initial}</div>
+              <span class="card-name">${name}</span>
+              <span class="card-score-badge"><i class="bi bi-lightning-fill"></i> ${v.score}pt</span>
             </div>
-          </td>
-        </tr>`;
+            <div class="card-body">
+              <div class="card-stat">
+                <i class="bi bi-list-check"></i>
+                未完了タスク <strong>${v.count}件</strong>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${pct}%"></div>
+              </div>
+            </div>
+          </div>`;
       });
-
-      html += `</tbody></table>`;
+      html += `</div>`;
     }
 
     document.getElementById('summary').innerHTML = html;
@@ -3601,15 +3762,25 @@
 
     document.getElementById("fileName").textContent = file.name;
 
-    Papa.parse(file, {
-      header:         true,
-      skipEmptyLines: true,
-      complete: (result) => {
-        const data = result.data.map(parseRow);
-        showTab('gantt');
-        renderChart(data);
-      }
-    });
+    // Shift-JIS / UTF-8 自動判定
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const bytes = new Uint8Array(ev.target.result);
+      // BOM確認 (UTF-8 BOM: EF BB BF)
+      const isUtf8Bom = bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF;
+      const encoding = isUtf8Bom ? "UTF-8" : "Shift-JIS";
+      Papa.parse(file, {
+        header:         true,
+        skipEmptyLines: true,
+        encoding:       encoding,
+        complete: (result) => {
+          const data = result.data.map(parseRow);
+          showTab('gantt');
+          renderChart(data);
+        }
+      });
+    };
+    reader.readAsArrayBuffer(file.slice(0, 3));
   });
 
   // ─── 初期表示（サンプルデータ） ──────────────────────────────────────
