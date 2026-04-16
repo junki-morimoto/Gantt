@@ -74,27 +74,85 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    #error {
-      display: none;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: white;
-      border: 1px solid #d83b01;
-      border-radius: 6px;
-      padding: 20px 28px;
-      text-align: center;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    /* ─── タブ ─── */
+    .tab-btn {
+      background: rgba(255,255,255,0.15);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.4);
+      padding: 5px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      white-space: nowrap;
     }
-    #error h2 { color: #d83b01; font-size: 15px; margin-bottom: 8px; }
-    #error p { font-size: 13px; color: #555; line-height: 1.6; }
+    .tab-btn:hover { background: rgba(255,255,255,0.25); }
+    .tab-btn.active {
+      background: white;
+      color: #0078d4;
+      font-weight: 600;
+    }
+
+    /* ─── 作業量サマリー ─── */
+    #summary {
+      display: none;
+      padding: 24px;
+      height: calc(100vh - 46px);
+      overflow-y: auto;
+      background: #f3f2f1;
+    }
+    #summary h2 {
+      font-size: 16px;
+      color: #323130;
+      margin-bottom: 16px;
+    }
+    .summary-table {
+      width: 100%;
+      max-width: 800px;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    .summary-table th {
+      background: #0078d4;
+      color: white;
+      padding: 10px 16px;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .summary-table td {
+      padding: 10px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid #edebe9;
+      color: #323130;
+    }
+    .summary-table tr:last-child td { border-bottom: none; }
+    .summary-table tr:hover td { background: #f3f2f1; }
+    .score-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .score-bar {
+      height: 12px;
+      background: #0078d4;
+      border-radius: 6px;
+      min-width: 4px;
+      transition: width 0.3s;
+    }
+    .score-num { font-weight: 600; color: #0078d4; min-width: 28px; }
+    .score-note { font-size: 11px; color: #888; }
   </style>
 </head>
 <body>
 
 <div id="header">
   <h1>📊 プロジェクト ガントチャート</h1>
+  <button class="tab-btn active" id="tabGantt" onclick="showTab('gantt')">📅 ガントチャート</button>
+  <button class="tab-btn"        id="tabSummary" onclick="showTab('summary')">👤 作業量サマリー</button>
   <label class="btn-upload" for="csvFile">
     📂 CSVを読み込む
   </label>
@@ -103,6 +161,7 @@
 </div>
 
 <div id="vis"></div>
+<div id="summary"></div>
 
 <div id="loading">
   <div class="spinner"></div>
@@ -3436,10 +3495,84 @@
     return spec;
   }
 
+  // ─── タブ切り替え ────────────────────────────────────────────────────
+  function showTab(tab) {
+    const isGantt = tab === 'gantt';
+    document.getElementById('vis').style.display     = isGantt ? 'block' : 'none';
+    document.getElementById('summary').style.display = isGantt ? 'none'  : 'block';
+    document.getElementById('tabGantt').classList.toggle('active',   isGantt);
+    document.getElementById('tabSummary').classList.toggle('active', !isGantt);
+  }
+
+  // ─── 難易度スコア ────────────────────────────────────────────────────
+  const STATUS_SCORE = {
+    'very low': 1, 'low': 2, 'medium': 3, 'midium': 3, 'high': 4, 'very high': 5
+  };
+
+  function getScore(status) {
+    return STATUS_SCORE[(status || '').toLowerCase().trim()] || 1;
+  }
+
+  // ─── 作業量サマリー描画 ──────────────────────────────────────────────
+  function renderSummary(data) {
+    // マイルストーン行は除外、未完了（completion < 100）のみ集計
+    const incomplete = data.filter(d => d.milestone !== true && (parseInt(d.completion) || 0) < 100);
+
+    // 担当者ごとに集計
+    const map = {};
+    incomplete.forEach(d => {
+      const name = d.assignee || '(未設定)';
+      if (!map[name]) map[name] = { count: 0, score: 0 };
+      map[name].count++;
+      map[name].score += getScore(d.status);
+    });
+
+    const rows = Object.entries(map).sort((a, b) => b[1].score - a[1].score);
+    const maxScore = rows.length ? rows[0][1].score : 1;
+
+    let html = `<h2>作業量サマリー <span style="font-size:12px;color:#888;font-weight:normal;">（未完了タスク × 難易度スコア）</span></h2>`;
+    html += `<p style="font-size:12px;color:#888;margin-bottom:16px;">
+      難易度スコア：Very Low=1 / Low=2 / Medium=3 / High=4 / Very High=5
+    </p>`;
+
+    if (rows.length === 0) {
+      html += `<p style="color:#888;font-size:13px;">未完了タスクがありません。</p>`;
+    } else {
+      html += `<table class="summary-table">
+        <thead><tr>
+          <th>担当者</th>
+          <th>未完了タスク数</th>
+          <th>作業量スコア</th>
+        </tr></thead><tbody>`;
+
+      rows.forEach(([name, v]) => {
+        const barWidth = Math.round((v.score / maxScore) * 200);
+        html += `<tr>
+          <td>${name}</td>
+          <td>${v.count} 件</td>
+          <td>
+            <div class="score-bar-wrap">
+              <div class="score-bar" style="width:${barWidth}px"></div>
+              <span class="score-num">${v.score}</span>
+              <span class="score-note">pt</span>
+            </div>
+          </td>
+        </tr>`;
+      });
+
+      html += `</tbody></table>`;
+    }
+
+    document.getElementById('summary').innerHTML = html;
+  }
+
   // ─── チャート描画 ─────────────────────────────────────────────────────
-  let vegaView = null;
+  let vegaView  = null;
+  let lastData  = null;
 
   function renderChart(data) {
+    lastData = data;
+    renderSummary(data);
     document.getElementById("loading").style.display = "block";
     document.getElementById("vis").innerHTML = "";
 
@@ -3473,6 +3606,7 @@
       skipEmptyLines: true,
       complete: (result) => {
         const data = result.data.map(parseRow);
+        showTab('gantt');
         renderChart(data);
       }
     });
