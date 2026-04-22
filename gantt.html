@@ -3978,7 +3978,7 @@
   const CHIP_NAME  = ['','Very Low','Low','Medium','High','Very High'];
 
   function renderSummary(data) {
-    const incomplete = data.filter(d => d.milestone !== true && (parseInt(d.completion) || 0) < 100);
+    const incomplete = data.filter(d => d.milestone !== true && (parseInt(d.completion) || 0) < 100 && d.assignee !== '参考');
 
     const map = {};
     incomplete.forEach(d => {
