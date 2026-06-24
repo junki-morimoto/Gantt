@@ -562,7 +562,7 @@
     <i class="bi bi-people-fill"></i> TASK SUMMARY
   </button>
   <button class="tab-btn" id="tabLoad" onclick="showTab('load')">
-    <i class="bi bi-bar-chart-fill"></i> LOAD GRAPH
+    <i class="bi bi-bar-chart-fill"></i> 負荷グラフ
   </button>
   <button class="tab-btn" id="tabHelp" onclick="showTab('help')">
     <i class="bi bi-question-circle-fill"></i> 使い方
@@ -1502,7 +1502,7 @@
         },
         {
           "type": "filter",
-          "expr": "!indata('collapsedPhases', 'phase', datum.phase)"
+          "expr": "!indata('collapsedPhases', 'phaseKey', datum.phaseKey)"
         },
         {
           "type": "formula",
@@ -1695,7 +1695,7 @@
       "transform": [
         {
           "type": "filter",
-          "expr": "indata('collapsedPhases', 'phase', datum.phase) "
+          "expr": "indata('collapsedPhases', 'phaseKey', datum.phaseKey)"
         },
         {
           "type": "joinaggregate",
@@ -1818,15 +1818,20 @@
           ]
         },
         {
+          "type": "formula",
+          "as": "sourcePhaseKey",
+          "expr": "toString(datum.sourceProject) + '|' + toString(datum.sourcePhase)"
+        },
+        {
           "type": "lookup",
           "from": "phases",
-          "key": "phase",
+          "key": "phaseKey",
           "values": [
             "id",
             "end"
           ],
           "fields": [
-            "sourcePhase"
+            "sourcePhaseKey"
           ],
           "as": [
             "sourcePhaseId",
@@ -1836,12 +1841,12 @@
         {
           "type": "formula",
           "as": "sourceId",
-          "expr": "indata('collapsedPhases', 'phase', datum.sourcePhase) == true?datum.sourcePhaseId:datum.sourceId"
+          "expr": "indata('collapsedPhases', 'phaseKey', datum.sourcePhaseKey) == true?datum.sourcePhaseId:datum.sourceId"
         },
         {
           "type": "formula",
           "as": "sourceEnd",
-          "expr": "indata('collapsedPhases', 'phase', datum.sourcePhase) == true?datum.sourcePhaseEnd:datum.sourceEnd"
+          "expr": "indata('collapsedPhases', 'phaseKey', datum.sourcePhaseKey) == true?datum.sourcePhaseEnd:datum.sourceEnd"
         },
         {
           "type": "formula",
