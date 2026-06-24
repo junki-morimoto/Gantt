@@ -8,6 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; }
@@ -280,6 +281,107 @@
     .chip-h  { background:#fff3e0; color:#e65100; border-color:#ffcc80; }
     .chip-vh { background:#fce4ec; color:#c62828; border-color:#f48fb1; }
 
+    /* ─── 負荷グラフ ─── */
+    #load {
+      display: none;
+      padding: 28px 32px;
+      height: calc(100vh - 52px);
+      overflow-y: auto;
+      background: #f0f2f5;
+    }
+    .load-header {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .load-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+    .load-header .subtitle { font-size: 12px; color: #888; }
+    .load-note {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .load-note i { color: #0078d4; }
+    .load-chart-wrap {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      padding: 24px;
+      max-width: 1000px;
+      margin-bottom: 24px;
+    }
+    .load-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .load-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      color: #444;
+    }
+    .load-legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .load-table-wrap {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      padding: 20px 24px;
+      max-width: 1000px;
+    }
+    .load-table-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .load-table-title i { color: #0078d4; }
+    .load-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    .load-table th {
+      background: #f0f2f5;
+      color: #444;
+      padding: 8px 12px;
+      text-align: center;
+      font-weight: 600;
+      border-bottom: 2px solid #ddd;
+      white-space: nowrap;
+    }
+    .load-table th:first-child { text-align: left; }
+    .load-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #f0f0f0;
+      text-align: center;
+      color: #333;
+    }
+    .load-table td:first-child { text-align: left; font-weight: 600; }
+    .load-table tr:last-child td { border-bottom: none; }
+    .load-cell-high   { background: #fce4ec; color: #c62828; font-weight: 700; border-radius: 4px; }
+    .load-cell-mid    { background: #fff8e1; color: #f57f17; font-weight: 600; border-radius: 4px; }
+    .load-cell-low    { background: #e8f5e9; color: #2e7d32; border-radius: 4px; }
+    .load-cell-empty  { color: #ccc; }
+
     /* ─── 使い方 ─── */
     #help {
       display: none;
@@ -459,8 +561,11 @@
   <button class="tab-btn" id="tabSummary" onclick="showTab('summary')">
     <i class="bi bi-people-fill"></i> TASK SUMMARY
   </button>
+  <button class="tab-btn" id="tabLoad" onclick="showTab('load')">
+    <i class="bi bi-bar-chart-fill"></i> 負荷グラフ
+  </button>
   <button class="tab-btn" id="tabHelp" onclick="showTab('help')">
-    <i class="bi bi-question-circle-fill"></i> HOW TO USE
+    <i class="bi bi-question-circle-fill"></i> 使い方
   </button>
   <div class="divider"></div>
   <label class="btn-upload" for="csvFile">
@@ -472,6 +577,7 @@
 
 <div id="vis"></div>
 <div id="summary"></div>
+<div id="load"></div>
 <div id="help"></div>
 
 <div id="loading">
@@ -3810,11 +3916,175 @@
   function showTab(tab) {
     document.getElementById('vis').style.display     = tab === 'gantt'   ? 'block' : 'none';
     document.getElementById('summary').style.display = tab === 'summary' ? 'block' : 'none';
+    document.getElementById('load').style.display    = tab === 'load'    ? 'block' : 'none';
     document.getElementById('help').style.display    = tab === 'help'    ? 'block' : 'none';
     document.getElementById('tabGantt').classList.toggle('active',   tab === 'gantt');
     document.getElementById('tabSummary').classList.toggle('active', tab === 'summary');
+    document.getElementById('tabLoad').classList.toggle('active',    tab === 'load');
     document.getElementById('tabHelp').classList.toggle('active',    tab === 'help');
     if (tab === 'help') renderHelp();
+    if (tab === 'load' && lastData) renderLoad(lastData);
+  }
+
+  // ─── カラーパレット ───────────────────────────────────────────────────
+  const LOAD_COLORS = [
+    '#0078d4','#107c10','#d83b01','#8764b8','#038387',
+    '#c239b3','#986f0b','#00b294','#e81123','#4f6bed'
+  ];
+
+  // ─── 負荷グラフ描画 ───────────────────────────────────────────────────
+  let loadChartInstance = null;
+
+  function renderLoad(data) {
+    const tasks = data.filter(d => d.milestone !== true && (parseInt(d.completion) || 0) < 100 && (d.assignee || '') !== '参考');
+    if (tasks.length === 0) {
+      document.getElementById('load').innerHTML =
+        `<p style="color:#888;font-size:13px;padding:28px 32px;">
+          <i class="bi bi-check-circle" style="color:#43a047;margin-right:6px;"></i>未完了タスクがありません。
+        </p>`;
+      return;
+    }
+
+    // 日付範囲を取得
+    const allStarts = tasks.map(d => new Date(d.start)).filter(d => !isNaN(d));
+    const allEnds   = tasks.map(d => new Date(d.end)).filter(d => !isNaN(d));
+    const minDate = new Date(Math.min(...allStarts));
+    const maxDate = new Date(Math.max(...allEnds));
+
+    // 月リストを生成
+    const months = [];
+    const cur = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+    while (cur <= maxDate) {
+      months.push(new Date(cur));
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    const monthLabels = months.map(m =>
+      `${m.getFullYear()}/${String(m.getMonth()+1).padStart(2,'0')}`
+    );
+
+    // 担当者リスト
+    const assignees = [...new Set(tasks.map(d => d.assignee || '(未設定)'))].sort();
+
+    // 月×担当者のスコアを計算
+    const scoreMatrix = {};
+    assignees.forEach(a => { scoreMatrix[a] = Array(months.length).fill(0); });
+
+    tasks.forEach(t => {
+      const name      = t.assignee || '(未設定)';
+      const taskStart = new Date(t.start);
+      const taskEnd   = new Date(t.end);
+      const score     = getScore(t.status);
+      months.forEach((m, i) => {
+        const mEnd = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+        if (taskStart <= mEnd && taskEnd >= m) {
+          scoreMatrix[name][i] += score;
+        }
+      });
+    });
+
+    // ─── Chart.js データセット ───────────────────────────────────────
+    const datasets = assignees.map((name, i) => ({
+      label: name,
+      data:  scoreMatrix[name],
+      backgroundColor: LOAD_COLORS[i % LOAD_COLORS.length] + 'cc',
+      borderColor:     LOAD_COLORS[i % LOAD_COLORS.length],
+      borderWidth: 1,
+      borderRadius: 4,
+    }));
+
+    // ─── 最大値からセル色分けの閾値を計算 ───────────────────────────
+    const allScores = Object.values(scoreMatrix).flat().filter(v => v > 0);
+    const maxScore  = allScores.length ? Math.max(...allScores) : 1;
+    const highThresh = maxScore * 0.7;
+    const midThresh  = maxScore * 0.35;
+
+    // ─── HTML構築 ───────────────────────────────────────────────────
+    // 凡例
+    const legendHtml = assignees.map((name, i) => `
+      <span class="load-legend-item">
+        <span class="load-legend-dot" style="background:${LOAD_COLORS[i % LOAD_COLORS.length]}"></span>
+        ${name}
+      </span>`).join('');
+
+    // テーブル（月×担当者マトリクス）
+    const headerCells = months.map((m, i) =>
+      `<th>${m.getMonth()+1}月</th>`
+    ).join('');
+
+    const tableRows = assignees.map((name, ai) => {
+      const cells = scoreMatrix[name].map(v => {
+        if (v === 0) return `<td class="load-cell-empty">-</td>`;
+        const cls = v >= highThresh ? 'load-cell-high' : v >= midThresh ? 'load-cell-mid' : 'load-cell-low';
+        return `<td><span class="${cls}" style="padding:2px 8px;">${v}pt</span></td>`;
+      }).join('');
+      return `<tr><td>${name}</td>${cells}</tr>`;
+    }).join('');
+
+    document.getElementById('load').innerHTML = `
+      <div class="load-header">
+        <h2><i class="bi bi-bar-chart-fill" style="color:#0078d4;margin-right:8px;"></i>月別負荷グラフ</h2>
+        <span class="subtitle">未完了タスク × 難易度スコア（その月に期間が重なるタスク）</span>
+      </div>
+      <div class="load-note">
+        <i class="bi bi-info-circle-fill"></i>
+        スコアが高いほど負荷が大きいことを示します。担当者間のバランスをご確認ください。
+      </div>
+
+      <div class="load-chart-wrap">
+        <div class="load-legend">${legendHtml}</div>
+        <canvas id="loadChart" height="90"></canvas>
+      </div>
+
+      <div class="load-table-wrap">
+        <div class="load-table-title">
+          <i class="bi bi-grid-3x3"></i> 月別スコアマトリクス
+          <span style="font-size:11px;color:#888;font-weight:normal;margin-left:8px;">
+            <span style="background:#fce4ec;color:#c62828;padding:1px 6px;border-radius:3px;">高</span>
+            <span style="background:#fff8e1;color:#f57f17;padding:1px 6px;border-radius:3px;margin-left:4px;">中</span>
+            <span style="background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:3px;margin-left:4px;">低</span>
+          </span>
+        </div>
+        <table class="load-table">
+          <thead><tr>
+            <th>担当者</th>${headerCells}
+          </tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    `;
+
+    // 既存チャートを破棄して再描画
+    if (loadChartInstance) loadChartInstance.destroy();
+    loadChartInstance = new Chart(
+      document.getElementById('loadChart'),
+      {
+        type: 'bar',
+        data: { labels: monthLabels, datasets },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` ${ctx.dataset.label}：${ctx.parsed.y}pt`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { font: { size: 12 } }
+            },
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'スコア (pt)', font: { size: 11 }, color: '#888' },
+              ticks: { font: { size: 11 } },
+              grid:  { color: '#f0f0f0' }
+            }
+          }
+        }
+      }
+    );
   }
 
   // ─── 使い方ページ描画 ─────────────────────────────────────────────────
