@@ -1276,11 +1276,28 @@
             "project"
           ],
           "ops": [
-            "row_number",
             "row_number"
           ],
           "as": [
-            "phaseSort",
+            "phaseSort"
+          ]
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": [
+              "project",
+              "start"
+            ],
+            "order": [
+              "ascending",
+              "ascending"
+            ]
+          },
+          "ops": [
+            "row_number"
+          ],
+          "as": [
             "id"
           ]
         },
