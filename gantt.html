@@ -281,6 +281,48 @@
     .chip-h  { background:#fff3e0; color:#e65100; border-color:#ffcc80; }
     .chip-vh { background:#fce4ec; color:#c62828; border-color:#f48fb1; }
 
+    .task-list-title {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #888;
+      margin: 12px 0 4px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .task-list { border-top: 1px solid #f0f0f0; }
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 2px;
+      font-size: 12px;
+      border-bottom: 1px solid #f6f6f6;
+    }
+    .task-item:last-child { border-bottom: none; }
+    .task-item-risk {
+      background: #fff5f5;
+      border-radius: 4px;
+    }
+    .task-item-risk .ti-name { color: #c62828; font-weight: 600; }
+    .task-item-risk .ti-prog { color: #e03131; }
+    .task-item .ti-name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #333;
+    }
+    .task-item .ti-phase { font-size: 10.5px; color: #aaa; font-weight: normal; }
+    .task-item .ti-prog {
+      flex: none;
+      width: 42px;
+      text-align: right;
+      font-weight: 600;
+      color: #0078d4;
+    }
+
     /* ─── 負荷グラフ ─── */
     #load {
       display: none;
@@ -560,9 +602,6 @@
   </button>
   <button class="tab-btn" id="tabSummary" onclick="showTab('summary')">
     <i class="bi bi-people-fill"></i> TASK SUMMARY
-  </button>
-  <button class="tab-btn" id="tabLoad" onclick="showTab('load')">
-    <i class="bi bi-bar-chart-fill"></i> 負荷グラフ
   </button>
   <button class="tab-btn" id="tabHelp" onclick="showTab('help')">
     <i class="bi bi-question-circle-fill"></i> 使い方
@@ -3936,16 +3975,16 @@
 
   // ─── タブ切り替え ────────────────────────────────────────────────────
   function showTab(tab) {
+    // TASK SUMMARY タブにサマリーカードと負荷グラフをまとめて表示
     document.getElementById('vis').style.display     = tab === 'gantt'   ? 'block' : 'none';
     document.getElementById('summary').style.display = tab === 'summary' ? 'block' : 'none';
-    document.getElementById('load').style.display    = tab === 'load'    ? 'block' : 'none';
+    document.getElementById('load').style.display    = tab === 'summary' ? 'block' : 'none';
     document.getElementById('help').style.display    = tab === 'help'    ? 'block' : 'none';
     document.getElementById('tabGantt').classList.toggle('active',   tab === 'gantt');
     document.getElementById('tabSummary').classList.toggle('active', tab === 'summary');
-    document.getElementById('tabLoad').classList.toggle('active',    tab === 'load');
     document.getElementById('tabHelp').classList.toggle('active',    tab === 'help');
     if (tab === 'help') renderHelp();
-    if (tab === 'load' && lastData) renderLoad(lastData);
+    if (tab === 'summary' && lastData) { renderSummary(lastData); renderLoad(lastData); }
   }
 
   // ─── カラーパレット ───────────────────────────────────────────────────
@@ -4365,14 +4404,31 @@
   function renderSummary(data) {
     const incomplete = data.filter(d => d.milestone !== true && (parseInt(d.completion) || 0) < 100 && d.assignee !== '参考');
 
+    // 遅延判定用：今日(0時) と 3日(ms)。ガントの赤ハイライトと同条件
+    const now = new Date();
+    const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const THREE_DAYS = 3 * 86400000;
+
     const map = {};
     incomplete.forEach(d => {
       const name = d.assignee || '(未設定)';
       if (!map[name]) map[name] = { count: 0, score: 0, tasks: [] };
       const s = getScore(d.status);
+      const comp = parseInt(d.completion) || 0;
+      const end = new Date(d.end);
+      // 進捗60%以下 かつ 終了日の3日前を過ぎている → 遅延
+      const atRisk = !isNaN(end) && comp <= 60 && todayMid >= (end.getTime() - THREE_DAYS);
       map[name].count++;
       map[name].score += s;
-      map[name].tasks.push({ task: d.task, score: s, status: (d.status||'').toLowerCase().trim() });
+      map[name].tasks.push({
+        task: d.task || '',
+        project: d.project || '',
+        phase: d.phase || '',
+        completion: comp,
+        score: s,
+        rank: CHIP_CLASS[(d.status||'').toLowerCase().trim()] || 3,
+        atRisk
+      });
     });
 
     const entries = Object.entries(map).sort((a, b) => b[1].score - a[1].score);
@@ -4393,13 +4449,18 @@
         const pct = Math.round((v.score / maxScore) * 100);
         const initial = name.charAt(0).toUpperCase();
 
-        // タスクチップ
-        const chips = v.tasks.map(t => {
-          const rank = CHIP_CLASS[(t.status)] || 3;
-          return `<span class="chip ${CHIP_CSS[rank]}" title="${t.task}">
-            <i class="bi bi-tag-fill"></i>${CHIP_LABEL[rank]}
-          </span>`;
-        }).join('');
+        // 未完了タスク一覧（難易度の高い順）
+        const taskItems = v.tasks
+          .slice()
+          .sort((a, b) => b.score - a.score)
+          .map(t => `
+            <div class="task-item${t.atRisk ? ' task-item-risk' : ''}">
+              <span class="chip ${CHIP_CSS[t.rank]}">${CHIP_LABEL[t.rank]}</span>
+              <span class="ti-name" title="${t.project} / ${t.phase} / ${t.task}${t.atRisk ? '（遅延）' : ''}">
+                ${t.atRisk ? '<i class="bi bi-exclamation-triangle-fill" style="color:#e03131;margin-right:4px;"></i>' : ''}${t.task}<span class="ti-phase"> — ${t.phase}</span>
+              </span>
+              <span class="ti-prog">${t.completion}%</span>
+            </div>`).join('');
 
         html += `
           <div class="assignee-card">
@@ -4416,6 +4477,10 @@
               <div class="bar-track">
                 <div class="bar-fill" style="width:${pct}%"></div>
               </div>
+              <div class="task-list-title">
+                <i class="bi bi-card-checklist"></i> タスク項目一覧
+              </div>
+              <div class="task-list">${taskItems}</div>
             </div>
           </div>`;
       });
