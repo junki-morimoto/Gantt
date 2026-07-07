@@ -3993,6 +3993,30 @@
     '#c239b3','#986f0b','#00b294','#e81123','#4f6bed'
   ];
 
+  // ─── 月別担当者負荷グラフ用: 各バーの下に担当者名を表示するプラグイン ───
+  const assigneeAxisLabelPlugin = {
+    id: 'assigneeAxisLabel',
+    afterDraw(chart) {
+      const { ctx, scales } = chart;
+      const xScale = scales.x;
+      ctx.save();
+      ctx.font = '9px sans-serif';
+      ctx.fillStyle = '#888';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      chart.data.datasets.forEach((dataset, dsIndex) => {
+        const meta = chart.getDatasetMeta(dsIndex);
+        if (meta.hidden) return;
+        meta.data.forEach((bar, i) => {
+          if (!dataset.data[i]) return;   // 値0のバーは表示しない
+          const label = dataset.label.length > 4 ? dataset.label.slice(0, 4) + '…' : dataset.label;
+          ctx.fillText(label, bar.x, xScale.bottom + 3);
+        });
+      });
+      ctx.restore();
+    }
+  };
+
   // 開始日〜終了日（両端含む）の稼働日数。土日（0=日,6=土）を除く
   function workingDays(start, end) {
     let count = 0;
@@ -4158,8 +4182,10 @@
       {
         type: 'bar',
         data: { labels: monthLabels, datasets },
+        plugins: [assigneeAxisLabelPlugin],
         options: {
           responsive: true,
+          layout: { padding: { bottom: 16 } },
           plugins: {
             legend: { display: false },
             tooltip: {
