@@ -4098,43 +4098,22 @@
       });
     });
 
-    // ─── Chart.js データセット ───────────────────────────────────────
-    const datasets = assignees.map((name, i) => ({
+    // ─── 最大値からセル色分けの閾値を計算（月別スコアマトリクスと同じロジック）───
+    const allScores   = Object.values(scoreMatrix).flat().filter(v => v > 0);
+    const maxScore    = allScores.length ? Math.max(...allScores) : 1;
+    const highThresh  = maxScore * 0.7;
+    const midThresh   = maxScore * 0.35;
+    const scoreColor  = v => v >= highThresh ? '#e03131' : v >= midThresh ? '#f57f17' : '#43a047';
+
+    // ─── Chart.js データセット（棒の色 = 高/中/低の相対評価）───────────
+    const datasets = assignees.map(name => ({
       label: name,
       data:  scoreMatrix[name],
-      backgroundColor: LOAD_COLORS[i % LOAD_COLORS.length] + 'cc',
-      borderColor:     LOAD_COLORS[i % LOAD_COLORS.length],
+      backgroundColor: scoreMatrix[name].map(v => scoreColor(v) + 'cc'),
+      borderColor:     scoreMatrix[name].map(v => scoreColor(v)),
       borderWidth: 1,
       borderRadius: 4,
     }));
-
-    // ─── 最大値からセル色分けの閾値を計算 ───────────────────────────
-    const allScores = Object.values(scoreMatrix).flat().filter(v => v > 0);
-    const maxScore  = allScores.length ? Math.max(...allScores) : 1;
-    const highThresh = maxScore * 0.7;
-    const midThresh  = maxScore * 0.35;
-
-    // ─── HTML構築 ───────────────────────────────────────────────────
-    // 凡例
-    const legendHtml = assignees.map((name, i) => `
-      <span class="load-legend-item">
-        <span class="load-legend-dot" style="background:${LOAD_COLORS[i % LOAD_COLORS.length]}"></span>
-        ${name}
-      </span>`).join('');
-
-    // テーブル（月×担当者マトリクス）
-    const headerCells = months.map((m, i) =>
-      `<th>${m.getMonth()+1}月</th>`
-    ).join('');
-
-    const tableRows = assignees.map((name, ai) => {
-      const cells = scoreMatrix[name].map(v => {
-        if (v === 0) return `<td class="load-cell-empty">-</td>`;
-        const cls = v >= highThresh ? 'load-cell-high' : v >= midThresh ? 'load-cell-mid' : 'load-cell-low';
-        return `<td><span class="${cls}" style="padding:2px 8px;">${v}pt</span></td>`;
-      }).join('');
-      return `<tr><td>${name}</td>${cells}</tr>`;
-    }).join('');
 
     document.getElementById('load').innerHTML = `
       <div class="load-header">
@@ -4148,27 +4127,16 @@
 
       <div class="load-table-title" style="margin-top:4px;">
         <i class="bi bi-people-fill"></i> 月別 担当者負荷（未完了タスク × 難易度スコア）
+        <span style="font-size:11px;color:#888;font-weight:normal;margin-left:8px;">
+          棒の色 =
+          <span style="background:#fce4ec;color:#c62828;padding:1px 6px;border-radius:3px;">高</span>
+          <span style="background:#fff8e1;color:#f57f17;padding:1px 6px;border-radius:3px;margin-left:4px;">中</span>
+          <span style="background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:3px;margin-left:4px;">低</span>
+          （各セルは最大スコアに対する相対評価。担当者名・値はホバーで表示）
+        </span>
       </div>
       <div class="load-chart-wrap">
-        <div class="load-legend">${legendHtml}</div>
         <canvas id="loadChart" height="90"></canvas>
-      </div>
-
-      <div class="load-table-wrap">
-        <div class="load-table-title">
-          <i class="bi bi-grid-3x3"></i> 月別スコアマトリクス
-          <span style="font-size:11px;color:#888;font-weight:normal;margin-left:8px;">
-            <span style="background:#fce4ec;color:#c62828;padding:1px 6px;border-radius:3px;">高</span>
-            <span style="background:#fff8e1;color:#f57f17;padding:1px 6px;border-radius:3px;margin-left:4px;">中</span>
-            <span style="background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:3px;margin-left:4px;">低</span>
-          </span>
-        </div>
-        <table class="load-table">
-          <thead><tr>
-            <th>担当者</th>${headerCells}
-          </tr></thead>
-          <tbody>${tableRows}</tbody>
-        </table>
       </div>
 
       <div class="load-table-title" style="margin-top:28px;">
