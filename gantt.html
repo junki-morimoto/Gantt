@@ -4024,19 +4024,30 @@
     // 各タスクの (開始〜終了の日数) × 標準工数8H を、プロジェクト単位で合計
     const STD_HOURS = 8;
     const projectHours = {};
+    const projectAssignees = {};   // プロジェクトごとのアサイン担当者(重複なし)
     data.forEach(d => {
       if (d.milestone === true) return;                 // マイルストーンは除外
       if ((d.assignee || '') === '参考') return;        // 参考行は除外
+      const p = d.project || '(未設定)';
+      if (d.assignee) {
+        if (!projectAssignees[p]) projectAssignees[p] = new Set();
+        projectAssignees[p].add(d.assignee);
+      }
       const s = new Date(d.start), e = new Date(d.end);
       if (isNaN(s) || isNaN(e)) return;                 // 日付が空/不正の行は除外
       const days  = workingDays(s, e);                  // 土日を除く稼働日数
       const hours = days * STD_HOURS;
-      const p = d.project || '(未設定)';
       projectHours[p] = (projectHours[p] || 0) + hours;
     });
     const projEntries  = Object.entries(projectHours).sort((a, b) => b[1] - a[1]);
     const projLabels   = projEntries.map(e => e[0]);
     const projHoursArr = projEntries.map(e => e[1]);
+    // 1人あたり工数 = プロジェクト工数 ÷ アサイン人数（未アサインは1人として計算）
+    const projPerPersonArr = projEntries.map(([p, hours]) => {
+      const n = projectAssignees[p] ? projectAssignees[p].size : 0;
+      return Math.round(hours / (n || 1));
+    });
+    const projAssigneeCountArr = projEntries.map(([p]) => projectAssignees[p] ? projectAssignees[p].size : 0);
 
     // 日付範囲を取得
     const allStarts = tasks.map(d => new Date(d.start)).filter(d => !isNaN(d));
@@ -4151,11 +4162,11 @@
       <div class="load-table-title" style="margin-top:28px;">
         <i class="bi bi-kanban-fill"></i> プロジェクト別 必要工数（人時）
         <span style="font-size:11px;color:#888;font-weight:normal;margin-left:8px;">
-          各タスクの稼働日数(土日除く) × 標準工数8H の合計
+          各タスクの稼働日数(土日除く) × 標準工数8H の合計／1人あたり = 必要工数 ÷ アサイン人数
         </span>
       </div>
       <div class="load-chart-wrap">
-        <canvas id="loadChartProj" height="90"></canvas>
+        <canvas id="loadChartProj" height="110"></canvas>
       </div>
     `;
 
@@ -4200,23 +4211,40 @@
         type: 'bar',
         data: {
           labels: projLabels,
-          datasets: [{
-            label: '必要工数',
-            data: projHoursArr,
-            backgroundColor: projLabels.map((_, i) => LOAD_COLORS[i % LOAD_COLORS.length] + 'cc'),
-            borderColor:     projLabels.map((_, i) => LOAD_COLORS[i % LOAD_COLORS.length]),
-            borderWidth: 1,
-            borderRadius: 4,
-          }]
+          datasets: [
+            {
+              label: '必要工数（合計）',
+              data: projHoursArr,
+              backgroundColor: LOAD_COLORS[0] + 'cc',
+              borderColor:     LOAD_COLORS[0],
+              borderWidth: 1,
+              borderRadius: 4,
+            },
+            {
+              label: '1人あたり必要工数',
+              data: projPerPersonArr,
+              backgroundColor: LOAD_COLORS[1] + 'cc',
+              borderColor:     LOAD_COLORS[1],
+              borderWidth: 1,
+              borderRadius: 4,
+            }
+          ]
         },
         options: {
           indexAxis: 'y',          // 横棒グラフ（プロジェクト数が多くても見やすい）
           responsive: true,
           plugins: {
-            legend: { display: false },
+            legend: { display: true, position: 'top', labels: { font: { size: 11 } } },
             tooltip: {
               callbacks: {
-                label: ctx => ` ${ctx.parsed.x} 人時（約 ${Math.round(ctx.parsed.x / 8)} 人日）`
+                label: ctx => {
+                  const days = Math.round(ctx.parsed.x / 8);
+                  if (ctx.datasetIndex === 1) {
+                    const n = projAssigneeCountArr[ctx.dataIndex];
+                    return ` ${ctx.dataset.label}：${ctx.parsed.x} 人時（約${days}人日）　アサイン${n}人`;
+                  }
+                  return ` ${ctx.dataset.label}：${ctx.parsed.x} 人時（約${days}人日）`;
+                }
               }
             }
           },
