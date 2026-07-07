@@ -4023,7 +4023,7 @@
     // ─── プロジェクト別 工数（人時）を集計 ─────────────────────────────
     // 各タスクの (開始〜終了の日数) × 標準工数8H を、プロジェクト単位で合計
     const STD_HOURS = 8;
-    const WORKLOAD_ALERT_RATE = 80;   // 稼働率(%)がこれを超えたら赤で警告
+    const WORKLOAD_ALERT_RATE = 100;  // 稼働率(%)がこれを超えたら赤で警告
     const projectHours = {};
     const projectAssignees = {};   // プロジェクトごとのアサイン担当者(重複なし)
     const projectSpan = {};        // プロジェクトごとの最早開始日・最遅終了日
