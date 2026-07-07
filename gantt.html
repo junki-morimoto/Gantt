@@ -4023,8 +4023,10 @@
     // ─── プロジェクト別 工数（人時）を集計 ─────────────────────────────
     // 各タスクの (開始〜終了の日数) × 標準工数8H を、プロジェクト単位で合計
     const STD_HOURS = 8;
+    const WORKLOAD_ALERT_RATE = 80;   // 稼働率(%)がこれを超えたら赤で警告
     const projectHours = {};
     const projectAssignees = {};   // プロジェクトごとのアサイン担当者(重複なし)
+    const projectSpan = {};        // プロジェクトごとの最早開始日・最遅終了日
     data.forEach(d => {
       if (d.milestone === true) return;                 // マイルストーンは除外
       if ((d.assignee || '') === '参考') return;        // 参考行は除外
@@ -4038,6 +4040,9 @@
       const days  = workingDays(s, e);                  // 土日を除く稼働日数
       const hours = days * STD_HOURS;
       projectHours[p] = (projectHours[p] || 0) + hours;
+      if (!projectSpan[p]) projectSpan[p] = { start: s, end: e };
+      if (s < projectSpan[p].start) projectSpan[p].start = s;
+      if (e > projectSpan[p].end)   projectSpan[p].end   = e;
     });
     const projEntries  = Object.entries(projectHours).sort((a, b) => b[1] - a[1]);
     const projLabels   = projEntries.map(e => e[0]);
@@ -4048,6 +4053,13 @@
       return Math.round(hours / (n || 1));
     });
     const projAssigneeCountArr = projEntries.map(([p]) => projectAssignees[p] ? projectAssignees[p].size : 0);
+    // 稼働率(%) = 1人あたり必要工数 ÷ (プロジェクト期間の稼働日数 × 8H) × 100
+    const projWorkloadRateArr = projEntries.map(([p], i) => {
+      const span = projectSpan[p];
+      const capacityDays  = span ? workingDays(span.start, span.end) : 0;
+      const capacityHours = capacityDays * STD_HOURS;
+      return capacityHours > 0 ? Math.round((projPerPersonArr[i] / capacityHours) * 100) : 0;
+    });
 
     // 日付範囲を取得
     const allStarts = tasks.map(d => new Date(d.start)).filter(d => !isNaN(d));
@@ -4163,6 +4175,7 @@
         <i class="bi bi-kanban-fill"></i> プロジェクト別 必要工数（人時）
         <span style="font-size:11px;color:#888;font-weight:normal;margin-left:8px;">
           各タスクの稼働日数(土日除く) × 標準工数8H の合計／1人あたり = 必要工数 ÷ アサイン人数
+          ／<span style="background:#fce4ec;color:#c62828;padding:1px 6px;border-radius:3px;">赤：プロジェクト期間の稼働率${WORKLOAD_ALERT_RATE}%以上（詰まっている）</span>
         </span>
       </div>
       <div class="load-chart-wrap">
@@ -4223,8 +4236,8 @@
             {
               label: '1人あたり必要工数',
               data: projPerPersonArr,
-              backgroundColor: LOAD_COLORS[1] + 'cc',
-              borderColor:     LOAD_COLORS[1],
+              backgroundColor: projWorkloadRateArr.map(r => r >= WORKLOAD_ALERT_RATE ? '#e03131cc' : LOAD_COLORS[1] + 'cc'),
+              borderColor:     projWorkloadRateArr.map(r => r >= WORKLOAD_ALERT_RATE ? '#e03131'   : LOAD_COLORS[1]),
               borderWidth: 1,
               borderRadius: 4,
             }
@@ -4241,7 +4254,9 @@
                   const days = Math.round(ctx.parsed.x / 8);
                   if (ctx.datasetIndex === 1) {
                     const n = projAssigneeCountArr[ctx.dataIndex];
-                    return ` ${ctx.dataset.label}：${ctx.parsed.x} 人時（約${days}人日）　アサイン${n}人`;
+                    const rate = projWorkloadRateArr[ctx.dataIndex];
+                    const warn = rate >= WORKLOAD_ALERT_RATE ? '⚠️ 高稼働率' : '';
+                    return ` ${ctx.dataset.label}：${ctx.parsed.x} 人時（約${days}人日）　アサイン${n}人　稼働率${rate}% ${warn}`;
                   }
                   return ` ${ctx.dataset.label}：${ctx.parsed.x} 人時（約${days}人日）`;
                 }
