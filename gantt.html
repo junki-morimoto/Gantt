@@ -1311,11 +1311,6 @@
         },
         {
           "type": "formula",
-          "as": "project",
-          "expr": "datum.category"
-        },
-        {
-          "type": "formula",
           "as": "status",
           "expr": "datum.status_rank == 1 ? 'Very Low' : datum.status_rank == 2 ? 'Low' : datum.status_rank == 3 ? 'Medium' : datum.status_rank == 4 ? 'High' : datum.status_rank == 5 ? 'Very High' : ''"
         },
