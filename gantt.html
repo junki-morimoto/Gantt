@@ -858,7 +858,7 @@
     },
     {
       "name": "todayRule",
-      "init": "timeFormat(today,'%d/%m/%y')"
+      "init": "timeFormat(today,'%Y/%m/%d')"
     },
     {
       "name": "zoom",
@@ -2432,7 +2432,7 @@
       "encode": {
         "update": {
           "text": {
-            "signal": "showDomainSpanLabel?timeFormat(xDom[0],'%d/%m/%y') +' - ' + timeFormat(xDom[1],'%d/%m/%y'):null"
+            "signal": "showDomainSpanLabel?timeFormat(xDom[0],'%Y/%m/%d') +' - ' + timeFormat(xDom[1],'%Y/%m/%d'):null"
           },
           "baseline": {
             "value": "bottom"
@@ -2719,7 +2719,7 @@
                     "signal": "scale('y', datum.id)+bandwidth('y')/2"
                   },
                   "text": {
-                    "signal": "timeFormat(datum.start,' %d/%m/%y')"
+                    "signal": "timeFormat(datum.start,' %Y/%m/%d')"
                   },
                   "font": {
                     "signal": "datum.phase == datum.task?'Arial':'Segoe UI'"
@@ -2785,7 +2785,7 @@
                     "signal": "scale('y', datum.id)+bandwidth('y')/2"
                   },
                   "text": {
-                    "signal": "timeFormat(datum.labelEnd,' %d/%m/%y')"
+                    "signal": "timeFormat(datum.labelEnd,' %Y/%m/%d')"
                   },
                   "font": {
                     "signal": "datum.phase == datum.task?'Arial':'Segoe UI'"
