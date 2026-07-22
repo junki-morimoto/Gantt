@@ -1331,13 +1331,13 @@
           ],
           "as": [
             "categorySort",
-            "id"
+            "idNum"
           ]
         },
         {
           "type": "formula",
           "as": "id",
-          "expr": "length(data('input')) + datum.id + '^^^^^'"
+          "expr": "'cat' + toString(datum.idNum) + '^^^^^'"
         },
         {
           "type": "formula",
@@ -1483,13 +1483,13 @@
             "row_number"
           ],
           "as": [
-            "id"
+            "idNum"
           ]
         },
         {
           "type": "formula",
           "as": "id",
-          "expr": "length(data('input')) + length(data('categories')) + datum.id + '^^^^^'"
+          "expr": "'ph' + toString(datum.idNum) + '^^^^^'"
         },
         {
           "type": "formula",
@@ -1597,13 +1597,13 @@
           ],
           "as": [
             "projectSort",
-            "id"
+            "idNum"
           ]
         },
         {
           "type": "formula",
           "as": "id",
-          "expr": "length(data('input')) + length(data('categories')) + length(data('phases')) + datum.id + '^^^^^'"
+          "expr": "'prj' + toString(datum.idNum) + '^^^^^'"
         },
         {
           "type": "formula",
