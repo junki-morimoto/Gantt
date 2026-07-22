@@ -4634,7 +4634,16 @@
             </div>
             <div class="faq-item">
               <div class="faq-q"><i class="bi bi-question-circle-fill"></i>チャートの表示が崩れる・一部のタスクが出ない</div>
-              <div class="faq-a"><i class="bi bi-check-circle-fill"></i><code>start</code>／<code>end</code> が空欄の行があると表示が崩れます。日付は必ず入力してください。また <code>status</code> は <code>very low / low / medium / high / very high</code> の5表記のみ有効です（<code>hard</code> 等は難易度として認識されません）。</div>
+              <div class="faq-a"><i class="bi bi-check-circle-fill"></i><b>いちばん多い原因は <code>start</code>（開始日）の空欄です。</b>納期(<code>end</code>)だけ入れた行（【組立図】系のタスクなど）は開始日が抜けやすく、開始日が空だとそのバーが描けず表示が崩れます。<b>毎回の更新前に、全タスクの <code>start</code> と <code>end</code> が埋まっているか必ず確認</b>してください。</div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-q"><i class="bi bi-question-circle-fill"></i>更新前のチェックリスト（表示崩れを防ぐ）</div>
+              <div class="faq-a"><i class="bi bi-check-circle-fill"></i>
+                ① <code>start</code>・<code>end</code> が<b>全行</b>埋まっている（空欄なし）／
+                ② 日付は <code>2026/7/17</code> の形式で統一（<code>2026-08-18</code> のハイフン形式を混ぜない）／
+                ③ <code>status</code> は <code>very low / low / medium / high / very high</code> の5表記のみ（<code>hard</code>・<code>easy</code>・日本語はNG）／
+                ④ <code>id</code> が重複していない
+              </div>
             </div>
             <div class="faq-item">
               <div class="faq-q"><i class="bi bi-question-circle-fill"></i>チャートが見切れている</div>
