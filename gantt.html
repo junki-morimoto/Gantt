@@ -1093,6 +1093,22 @@
       ]
     },
     {
+      "name": "typeClicked",
+      "value": null,
+      "on": [
+        {
+          "events": "@taskSelector:click,@typeOutline",
+          "update": "datum.rowType=='type' ? {typeKey: datum.typeKey} : null",
+          "force": true
+        },
+        {
+          "events": "@taskTooltips:click",
+          "update": "datum.datum.rowType=='type' ? {typeKey: datum.datum.typeKey} : null",
+          "force": true
+        }
+      ]
+    },
+    {
       "name": "itemHovered",
       "value": {
         "id": "",
@@ -1187,6 +1203,11 @@
         },
         {
           "type": "formula",
+          "as": "type",
+          "expr": "isValid(datum.type) && datum.type != '' ? datum.type : '(未分類)'"
+        },
+        {
+          "type": "formula",
           "as": "start",
           "expr": "+datetime(year(datum.start),month(datum.start),date(datum.start),hours(datum.start),minutes(datum.start))"
         },
@@ -1254,7 +1275,12 @@
         {
           "type": "formula",
           "as": "phaseKey",
-          "expr": "toString(datum.category) + '|' + toString(datum.project) + '|' + toString(datum.phase)"
+          "expr": "toString(datum.category) + '|' + toString(datum.project) + '|' + toString(datum.type) + '|' + toString(datum.phase)"
+        },
+        {
+          "type": "formula",
+          "as": "typeKey",
+          "expr": "toString(datum.category) + '|' + toString(datum.project) + '|' + toString(datum.type)"
         },
         {
           "type": "formula",
@@ -1347,7 +1373,7 @@
         {
           "type": "formula",
           "as": "levelOrder",
-          "expr": "-1"
+          "expr": "-2"
         },
         {
           "type": "formula",
@@ -1370,6 +1396,143 @@
         {
           "trigger": "closeRowsAll",
           "insert": "data('categories')"
+        },
+        {
+          "trigger": "openRowsAll",
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "types",
+      "source": "input",
+      "transform": [
+        {
+          "type": "aggregate",
+          "fields": [
+            "start",
+            "end",
+            "completion",
+            "labelEnd",
+            "status_rank"
+          ],
+          "ops": [
+            "min",
+            "max",
+            "mean",
+            "max",
+            "max"
+          ],
+          "as": [
+            "start",
+            "end",
+            "completion",
+            "labelEnd",
+            "status_rank"
+          ],
+          "groupby": [
+            "category",
+            "project",
+            "type",
+            "typeKey",
+            "projectKey"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "phase",
+          "expr": "datum.type"
+        },
+        {
+          "type": "formula",
+          "as": "task",
+          "expr": "datum.type"
+        },
+        {
+          "type": "formula",
+          "as": "status",
+          "expr": "datum.status_rank == 1 ? 'Very Low' : datum.status_rank == 2 ? 'Low' : datum.status_rank == 3 ? 'Medium' : datum.status_rank == 4 ? 'High' : datum.status_rank == 5 ? 'Very High' : ''"
+        },
+        {
+          "type": "formula",
+          "as": "completion",
+          "expr": "round(datum.completion)"
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": "start",
+            "order": "ascending"
+          },
+          "groupby": [
+            "projectKey"
+          ],
+          "ops": [
+            "row_number"
+          ],
+          "as": [
+            "typeSort"
+          ]
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": [
+              "projectKey",
+              "start"
+            ],
+            "order": [
+              "ascending",
+              "ascending"
+            ]
+          },
+          "ops": [
+            "row_number"
+          ],
+          "as": [
+            "idNum"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "id",
+          "expr": "'typ' + toString(datum.idNum) + '^^^^^'"
+        },
+        {
+          "type": "formula",
+          "as": "rowType",
+          "expr": "'type'"
+        },
+        {
+          "type": "formula",
+          "as": "levelOrder",
+          "expr": "0"
+        },
+        {
+          "type": "formula",
+          "as": "days",
+          "expr": "round(((datum.end-datum.start)/oneDay)*10)/10"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedCategories','category',datum.category)"
+        }
+      ]
+    },
+    {
+      "name": "collapsedTypes",
+      "on": [
+        {
+          "trigger": "typeClicked",
+          "toggle": "typeClicked"
+        },
+        {
+          "trigger": "closeRowsAll",
+          "remove": true
+        },
+        {
+          "trigger": "closeRowsAll",
+          "insert": "data('types')"
         },
         {
           "trigger": "openRowsAll",
@@ -1413,6 +1576,7 @@
           "groupby": [
             "category",
             "project",
+            "type",
             "phase"
           ]
         },
@@ -1424,7 +1588,12 @@
         {
           "type": "formula",
           "as": "phaseKey",
-          "expr": "toString(datum.category) + '|' + toString(datum.project) + '|' + toString(datum.phase)"
+          "expr": "toString(datum.category) + '|' + toString(datum.project) + '|' + toString(datum.type) + '|' + toString(datum.phase)"
+        },
+        {
+          "type": "formula",
+          "as": "typeKey",
+          "expr": "toString(datum.category) + '|' + toString(datum.project) + '|' + toString(datum.type)"
         },
         {
           "type": "formula",
@@ -1458,7 +1627,7 @@
             "order": "ascending"
           },
           "groupby": [
-            "project"
+            "typeKey"
           ],
           "ops": [
             "row_number"
@@ -1471,7 +1640,7 @@
           "type": "window",
           "sort": {
             "field": [
-              "project",
+              "projectKey",
               "start"
             ],
             "order": [
@@ -1504,6 +1673,10 @@
         {
           "type": "filter",
           "expr": "!indata('collapsedCategories','category',datum.category)"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedTypes','typeKey',datum.typeKey)"
         },
         {
           "type": "filter",
@@ -1613,7 +1786,7 @@
         {
           "type": "formula",
           "as": "levelOrder",
-          "expr": "0"
+          "expr": "-1"
         },
         {
           "type": "formula",
@@ -1708,6 +1881,10 @@
         },
         {
           "type": "filter",
+          "expr": "!indata('collapsedTypes', 'typeKey', datum.typeKey)"
+        },
+        {
+          "type": "filter",
           "expr": "focusProject==null || datum.project==focusProject"
         }
       ]
@@ -1744,6 +1921,10 @@
         },
         {
           "type": "filter",
+          "expr": "!indata('collapsedTypes', 'typeKey', datum.typeKey)"
+        },
+        {
+          "type": "filter",
           "expr": "focusProject==null || datum.project==focusProject"
         }
       ]
@@ -1752,6 +1933,7 @@
       "name": "yScale",
       "source": [
         "categories",
+        "types",
         "tasks",
         "phases",
         "milestones",
@@ -1773,6 +1955,20 @@
           ]
         },
         {
+          "type": "lookup",
+          "from": "types",
+          "key": "typeKey",
+          "values": [
+            "typeSort"
+          ],
+          "as": [
+            "typeSort"
+          ],
+          "fields": [
+            "typeKey"
+          ]
+        },
+        {
           "type": "filter",
           "expr": "datum.rowType == 'category' || datum.rowType == 'project' || !indata('collapsedProjects','projectKey', datum.projectKey)"
         },
@@ -1782,11 +1978,13 @@
             "field": [
               "category",
               "project",
+              "typeSort",
               "phaseSort",
               "levelOrder",
               "taskSort"
             ],
             "order": [
+              "ascending",
               "ascending",
               "ascending",
               "ascending",
@@ -1857,6 +2055,23 @@
       "name": "categoryPaths",
       "source": [
         "categories"
+      ],
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "indata('yScale','id',datum.id)"
+        },
+        {
+          "type": "formula",
+          "as": "phasePath",
+          "expr": "'M ' + scale('x', datum.start)+' '  +   (scale('y', datum.id)+yPaddingInner) + ' H ' +  scale('x', datum.end)+' '   + ' v ' +  phaseSymbolHeight + ' L ' +  (scale('x', datum.end) - phaseSymbolWidth) +' '  +   (scale('y', datum.id)+yPaddingInner+phaseSymbolHeight/2 ) + ' L ' +  (scale('x', datum.start)+phaseSymbolWidth) + ' '  +   (scale('y', datum.id)+yPaddingInner+phaseSymbolHeight/2) + ' L ' +  (scale('x', datum.start)) + ' '  +   (scale('y', datum.id)+ yPaddingInner+phaseSymbolHeight) + ' z'"
+        }
+      ]
+    },
+    {
+      "name": "typePaths",
+      "source": [
+        "types"
       ],
       "transform": [
         {
@@ -2662,7 +2877,7 @@
                     "signal": "(scale('y', datum.id)+bandwidth('y')/2)-1"
                   },
                   "shape": {
-                    "signal": "datum.rowType == 'category' && !indata('collapsedCategories','category', datum.category) ? 'triangle-down': datum.rowType == 'category' && indata('collapsedCategories','category', datum.category) ? 'triangle-right': datum.rowType == 'project' && !indata('collapsedProjects','projectKey', datum.projectKey) ? 'triangle-down': datum.rowType == 'project' &&  indata('collapsedProjects','projectKey', datum.projectKey) ? 'triangle-right': datum.phase == datum.task && !indata('collapsedPhases','phaseKey', datum.phaseKey) ? 'triangle-down' : datum.phase == datum.task &&  indata('collapsedPhases','phaseKey', datum.phaseKey) ? 'triangle-right': ''"
+                    "signal": "datum.rowType == 'category' && !indata('collapsedCategories','category', datum.category) ? 'triangle-down': datum.rowType == 'category' && indata('collapsedCategories','category', datum.category) ? 'triangle-right': datum.rowType == 'project' && !indata('collapsedProjects','projectKey', datum.projectKey) ? 'triangle-down': datum.rowType == 'project' &&  indata('collapsedProjects','projectKey', datum.projectKey) ? 'triangle-right': datum.rowType == 'type' && !indata('collapsedTypes','typeKey', datum.typeKey) ? 'triangle-down': datum.rowType == 'type' &&  indata('collapsedTypes','typeKey', datum.typeKey) ? 'triangle-right': datum.rowType != 'type' && datum.phase == datum.task && !indata('collapsedPhases','phaseKey', datum.phaseKey) ? 'triangle-down' : datum.rowType != 'type' && datum.phase == datum.task &&  indata('collapsedPhases','phaseKey', datum.phaseKey) ? 'triangle-right': ''"
                   }
                 }
               }
@@ -3555,6 +3770,36 @@
           }
         },
         {
+          "name": "typeOutline",
+          "description": "The type (機械/制御) bar outlines",
+          "type": "path",
+          "from": {
+            "data": "typePaths"
+          },
+          "encode": {
+            "update": {
+              "path": {
+                "signal": "datum.phasePath"
+              },
+              "fill": {
+                "signal": "datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?merge(hsl(scale('cLight', datum.phase)), {l:0.65}):scale('cLight', datum.phase)"
+              },
+              "stroke": {
+                "signal": "datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):scale('cDark', datum.phase)"
+              },
+              "strokeWidth": {
+                "signal": "datum.id == itemHovered.id?1.5:1"
+              },
+              "tooltip": {
+                "signal": "showTooltips&&down==null?{'区分':datum.type , 'Start':timeFormat(datum.start,'%a, %d %B %Y' ),'End':timeFormat(datum.labelEnd,'%a, %d %B %Y' ), 'Days':datum.days,'Progress':datum.completion+'%' }:null"
+              },
+              "cursor": {
+                "value": "pointer"
+              }
+            }
+          }
+        },
+        {
           "name": "phaseOutline",
           "description": "The phase bar outlines",
           "type": "path",
@@ -4057,6 +4302,10 @@
           {
             "data": "input",
             "field": "category"
+          },
+          {
+            "data": "input",
+            "field": "type"
           }
         ]
       }
@@ -4080,6 +4329,10 @@
           {
             "data": "input",
             "field": "category"
+          },
+          {
+            "data": "input",
+            "field": "type"
           }
         ]
       }
@@ -4151,13 +4404,13 @@
 
   // ─── サンプルデータ（Excelと同じ構造） ───────────────────────────────
   const SAMPLE_DATA = [
-    { id: 40, category: "開発機", project: "C", phase: "DR0", task: "ニーズ調査",    milestone: null, start: "2026-06-01", end: "2026-07-01", assignee: "thomas anderson", completion: 20, dependencies: "",   status: "very high" },
-    { id: 41, category: "開発機", project: "C", phase: "DR1", task: "task1",         milestone: null, start: "2026-07-01", end: "2026-08-01", assignee: "thomas anderson", completion: 0,  dependencies: "40",  status: "very low"  },
-    { id: 42, category: "開発機", project: "C", phase: "DR2", task: "task2",         milestone: null, start: "2026-08-01", end: "2026-09-01", assignee: "thomas anderson", completion: 65, dependencies: "41",  status: "low"       },
-    { id: 43, category: "開発機", project: "C", phase: "DR3", task: "task3",         milestone: null, start: "2026-09-01", end: "2026-10-01", assignee: "thomas anderson", completion: 50, dependencies: "42",  status: "midium"    },
-    { id: 38, category: "開発機", project: "C", phase: "発注",  task: "発注",          milestone: null, start: "2026-10-01", end: "2026-11-01", assignee: "thomas anderson", completion: 0,  dependencies: "43",  status: "high"      },
-    { id: 44, category: "開発機", project: "C", phase: "発注",  task: "発注",          milestone: true, start: "2026-11-01", end: "2026-11-01", assignee: "thomas anderson", completion: 0,  dependencies: "38",  status: "high"      },
-    { id: 45, category: "開発機", project: "C", phase: "DR4",  task: "集計作業",      milestone: null, start: "2026-11-01", end: "2026-12-01", assignee: "thomas anderson", completion: 0,  dependencies: "44",  status: "very high" }
+    { id: 40, category: "開発機", project: "C", type: "機械", phase: "DR0", task: "ニーズ調査",    milestone: null, start: "2026-06-01", end: "2026-07-01", assignee: "thomas anderson", completion: 20, dependencies: "",   status: "very high", manhours: 40 },
+    { id: 41, category: "開発機", project: "C", type: "機械", phase: "DR1", task: "task1",         milestone: null, start: "2026-07-01", end: "2026-08-01", assignee: "thomas anderson", completion: 0,  dependencies: "40",  status: "very low",  manhours: 16 },
+    { id: 42, category: "開発機", project: "C", type: "機械", phase: "DR2", task: "task2",         milestone: null, start: "2026-08-01", end: "2026-09-01", assignee: "thomas anderson", completion: 65, dependencies: "41",  status: "low",       manhours: 24 },
+    { id: 43, category: "開発機", project: "C", type: "制御", phase: "DR3", task: "task3",         milestone: null, start: "2026-09-01", end: "2026-10-01", assignee: "山田",             completion: 50, dependencies: "42",  status: "midium",    manhours: 32 },
+    { id: 38, category: "開発機", project: "C", type: "制御", phase: "発注",  task: "発注",          milestone: null, start: "2026-10-01", end: "2026-11-01", assignee: "山田",             completion: 0,  dependencies: "43",  status: "high",      manhours: 8  },
+    { id: 44, category: "開発機", project: "C", type: "制御", phase: "発注",  task: "発注",          milestone: true, start: "2026-11-01", end: "2026-11-01", assignee: "山田",             completion: 0,  dependencies: "38",  status: "high",      manhours: 0  },
+    { id: 45, category: "開発機", project: "C", type: "制御", phase: "DR4",  task: "集計作業",      milestone: null, start: "2026-11-01", end: "2026-12-01", assignee: "山田",             completion: 0,  dependencies: "44",  status: "very high", manhours: 20 }
   ];
 
   // ─── CSV行をデータ形式に変換 ──────────────────────────────────────────
@@ -4167,6 +4420,7 @@
       id:           parseInt(row.id)            || 0,
       category:     (row.category && String(row.category).trim()) || "(未分類)",
       project:      row.project                 || "",
+      type:         (row.type && String(row.type).trim())         || "(未分類)",
       phase:        row.phase                   || "",
       task:         row.task                    || "",
       milestone:    milestone === "true" || milestone === "1" || milestone === "TRUE" ? true : null,
@@ -4175,7 +4429,8 @@
       assignee:     row.assignee                || "",
       completion:   parseInt(row.completion)    || 0,
       dependencies: row.dependencies != null ? String(row.dependencies).replace(/\.0$/, "") : "",
-      status:       row.status                  || ""
+      status:       row.status                  || "",
+      manhours:     parseFloat(row.manhours)    || 0
     };
   }
 
@@ -4289,13 +4544,22 @@
         projectAssignees[p].add(d.assignee);
       }
       const s = new Date(d.start), e = new Date(d.end);
-      if (isNaN(s) || isNaN(e)) return;                 // 日付が空/不正の行は除外
-      const days  = workingDays(s, e);                  // 土日を除く稼働日数
-      const hours = days * STD_HOURS;
-      projectHours[p] = (projectHours[p] || 0) + hours;
-      if (!projectSpan[p]) projectSpan[p] = { start: s, end: e };
-      if (s < projectSpan[p].start) projectSpan[p].start = s;
-      if (e > projectSpan[p].end)   projectSpan[p].end   = e;
+      const datesValid = !isNaN(s) && !isNaN(e);
+      // 工数(manhours)があればそれを使用。無ければ期間×8Hにフォールバック
+      const mh = parseFloat(d.manhours) || 0;
+      let hours = 0;
+      if (mh > 0) {
+        hours = mh;
+      } else if (datesValid) {
+        hours = workingDays(s, e) * STD_HOURS;          // フォールバック: 土日を除く稼働日数×8H
+      }
+      if (hours > 0) projectHours[p] = (projectHours[p] || 0) + hours;
+      // プロジェクト期間（稼働率の分母用）は日付が有効な行だけで算出
+      if (datesValid) {
+        if (!projectSpan[p]) projectSpan[p] = { start: s, end: e };
+        if (s < projectSpan[p].start) projectSpan[p].start = s;
+        if (e > projectSpan[p].end)   projectSpan[p].end   = e;
+      }
     });
     const projEntries  = Object.entries(projectHours).sort((a, b) => b[1] - a[1]);
     const projLabels   = projEntries.map(e => e[0]);
@@ -4395,7 +4659,7 @@
       <div class="load-table-title" style="margin-top:28px;">
         <i class="bi bi-kanban-fill"></i> プロジェクト別 必要工数（人時）
         <span style="font-size:11px;color:#888;font-weight:normal;margin-left:8px;">
-          各タスクの稼働日数(土日除く) × 標準工数8H の合計／1人あたり = 必要工数 ÷ アサイン人数
+          各タスクの工数(<code>manhours</code>)の合計（未入力の行は期間×8Hで補完）／1人あたり = 必要工数 ÷ アサイン人数
           ／<span style="background:#fce4ec;color:#c62828;padding:1px 6px;border-radius:3px;">赤：プロジェクト期間の稼働率${WORKLOAD_ALERT_RATE}%以上（詰まっている）</span>
         </span>
       </div>
@@ -4604,6 +4868,7 @@
                 <tr><td><code>id</code></td><td>行ごとの番号（重複不可）</td><td><span class="req">必須</span></td></tr>
                 <tr><td><code>category</code></td><td>大分類（例：<code>開発機</code> / <code>量産機</code>）。プロジェクトの上の階層としてグループ化される</td><td><span class="opt">任意（未入力は「(未分類)」扱い）</span></td></tr>
                 <tr><td><code>project</code></td><td>プロジェクト名</td><td><span class="req">必須</span></td></tr>
+                <tr><td><code>type</code></td><td>機械／制御の区分（例：<code>機械</code> / <code>制御</code>）。プロジェクトとフェーズの間の階層としてグループ化される</td><td><span class="opt">任意（未入力は「(未分類)」扱い）</span></td></tr>
                 <tr><td><code>phase</code></td><td>フェーズ名（DR0・DR1など）</td><td><span class="req">必須</span></td></tr>
                 <tr><td><code>task</code></td><td>タスク名</td><td><span class="req">必須</span></td></tr>
                 <tr><td><code>start</code></td><td>開始日（例：2026/06/01）</td><td><span class="req">必須</span></td></tr>
@@ -4611,6 +4876,7 @@
                 <tr><td><code>completion</code></td><td>進捗率（0〜100）</td><td><span class="req">必須</span></td></tr>
                 <tr><td><code>status</code></td><td>難易度。<b>次の5つの英語表記のみ</b>使用：<code>very low</code> / <code>low</code> / <code>medium</code> / <code>high</code> / <code>very high</code>（<code>hard</code>・<code>easy</code>・日本語などは認識されません）</td><td><span class="req">必須</span></td></tr>
                 <tr><td><code>assignee</code></td><td>担当者名</td><td><span class="opt">任意</span></td></tr>
+                <tr><td><code>manhours</code></td><td>そのタスクの見積工数（時間）。負荷グラフの「必要工数」に使われる。<b>未入力の場合は「期間×8H」で自動計算</b>（実態とズレやすいので、なるべく入力推奨）</td><td><span class="opt">任意</span></td></tr>
                 <tr><td><code>dependencies</code></td><td>依存タスクのid</td><td><span class="opt">任意</span></td></tr>
                 <tr><td><code>milestone</code></td><td>マイルストーンにする場合は <code>TRUE</code></td><td><span class="opt">任意</span></td></tr>
               </tbody>
