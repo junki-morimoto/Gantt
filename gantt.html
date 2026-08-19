@@ -1,1 +1,5235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PROJECT GANTT</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; }
 
+    /* ─── ヘッダー ─── */
+    #header {
+      background: linear-gradient(135deg, #0078d4 0%, #106ebe 100%);
+      color: white;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 52px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+      position: relative;
+      z-index: 10;
+    }
+    #header .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-right: 8px;
+    }
+    #header .logo i {
+      font-size: 20px;
+      opacity: 0.95;
+    }
+    #header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      flex: 1;
+      letter-spacing: 0.2px;
+    }
+    .divider {
+      width: 1px;
+      height: 24px;
+      background: rgba(255,255,255,0.3);
+      margin: 0 4px;
+    }
+
+    /* ─── 絞り込みバー ─── */
+    #filterBar {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      padding: 9px 16px;
+      background: #f4f7fb;
+      border-bottom: 1px solid #e2e8f2;
+      font-size: 12.5px;
+      color: #4a4f66;
+    }
+    #filterBar .fb-label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #0078d4; }
+    #filterBar input[type="text"],
+    #filterBar input[type="date"] {
+      font-family: inherit; font-size: 12.5px; color: #1a1a2e;
+      border: 1px solid #cdd6e5; border-radius: 6px; padding: 5px 9px; background: #fff;
+    }
+    #filterBar input[type="text"] { width: 200px; }
+    #filterBar input[type="text"]:focus,
+    #filterBar input[type="date"]:focus { outline: none; border-color: #0078d4; box-shadow: 0 0 0 2px rgba(0,120,212,0.15); }
+    #filterBar .fb-group { display: inline-flex; align-items: center; gap: 6px; }
+    #filterBar .fb-status { display: inline-flex; gap: 4px; }
+    #filterBar .fb-status button {
+      font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+      border: 1px solid #cdd6e5; background: #fff; color: #7b8194;
+      border-radius: 999px; padding: 3px 10px; transition: .12s;
+    }
+    #filterBar .fb-status button:hover { border-color: #0078d4; }
+    #filterBar .fb-status button.active { background: #0078d4; border-color: #0078d4; color: #fff; }
+    #filterBar .fb-clear {
+      font-family: inherit; font-size: 12px; cursor: pointer;
+      border: 1px solid #cdd6e5; background: #fff; color: #4a4f66;
+      border-radius: 6px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 5px;
+    }
+    #filterBar .fb-clear:hover { border-color: #d63b3b; color: #d63b3b; }
+    #filterBar .fb-count { margin-left: auto; color: #7b8194; font-weight: 600; white-space: nowrap; }
+    #filterBar .fb-count b { color: #0078d4; }
+
+    /* ─── タブボタン ─── */
+    .tab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      color: rgba(255,255,255,0.8);
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 0 12px;
+      height: 52px;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: all 0.15s;
+      border-radius: 0;
+    }
+    .tab-btn i { font-size: 15px; }
+    .tab-btn:hover {
+      color: white;
+      background: rgba(255,255,255,0.1);
+    }
+    .tab-btn.active {
+      color: white;
+      font-weight: 600;
+      border-bottom: 2px solid white;
+      background: rgba(255,255,255,0.1);
+    }
+
+    /* ─── アップロードボタン ─── */
+    .btn-upload {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.15);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.35);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .btn-upload i { font-size: 14px; }
+    .btn-upload:hover {
+      background: rgba(255,255,255,0.25);
+      border-color: rgba(255,255,255,0.6);
+    }
+
+    #csvFile { display: none; }
+
+    #fileName {
+      font-size: 11.5px;
+      opacity: 0.65;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ─── ガントチャートエリア ─── */
+    #vis {
+      width: 100vw;
+      height: calc(100vh - 52px);
+      overflow: hidden;
+    }
+
+    /* ─── ローディング ─── */
+    #loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: #666;
+    }
+    #loading .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #e0e0e0;
+      border-top-color: #0078d4;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      margin: 0 auto 12px;
+    }
+    #loading p { font-size: 13px; color: #888; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── 作業量サマリー ─── */
+    #summary {
+      display: none;
+      padding: 28px 32px;
+      height: calc(100vh - 52px);
+      overflow-y: auto;
+      background: #f0f2f5;
+    }
+    .summary-header {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .summary-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+    .summary-header .subtitle {
+      font-size: 12px;
+      color: #888;
+    }
+    .score-legend {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 11.5px;
+      color: #555;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* カードグリッド */
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+      max-width: 1100px;
+    }
+    .assignee-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      overflow: hidden;
+      transition: box-shadow 0.15s;
+    }
+    .assignee-card:hover {
+      box-shadow: 0 4px 16px rgba(0,120,212,0.13);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0078d4, #50a8f0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 15px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .card-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a2e;
+      flex: 1;
+    }
+    .card-score-badge {
+      background: #e8f0fe;
+      color: #0078d4;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+    .card-body { padding: 12px 16px 14px; }
+    .card-stat {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: #555;
+      margin-bottom: 10px;
+    }
+    .card-stat i { color: #0078d4; font-size: 14px; }
+    .bar-track {
+      background: #eef2f7;
+      border-radius: 6px;
+      height: 8px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 6px;
+      background: linear-gradient(90deg, #0078d4, #50a8f0);
+      transition: width 0.4s ease;
+    }
+    .task-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 10px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      border: 1px solid;
+    }
+    .chip-vl { background:#f0faf2; color:#2e7d32; border-color:#a5d6a7; }
+    .chip-l  { background:#e8f5e9; color:#388e3c; border-color:#c8e6c9; }
+    .chip-m  { background:#fff8e1; color:#f57f17; border-color:#ffe082; }
+    .chip-h  { background:#fff3e0; color:#e65100; border-color:#ffcc80; }
+    .chip-vh { background:#fce4ec; color:#c62828; border-color:#f48fb1; }
+
+    .task-list-title {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #888;
+      margin: 12px 0 4px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .task-list { border-top: 1px solid #f0f0f0; }
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 2px;
+      font-size: 12px;
+      border-bottom: 1px solid #f6f6f6;
+    }
+    .task-item:last-child { border-bottom: none; }
+    .task-item-risk {
+      background: #fff5f5;
+      border-radius: 4px;
+    }
+    .task-item-risk .ti-name { color: #c62828; font-weight: 600; }
+    .task-item-risk .ti-prog { color: #e03131; }
+    .task-item .ti-name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #333;
+    }
+    .task-item .ti-phase { font-size: 10.5px; color: #aaa; font-weight: normal; }
+    .task-item .ti-prog {
+      flex: none;
+      width: 42px;
+      text-align: right;
+      font-weight: 600;
+      color: #0078d4;
+    }
+
+    /* ─── 負荷グラフ ─── */
+    #load {
+      display: none;
+      padding: 28px 32px;
+      height: calc(100vh - 52px);
+      overflow-y: auto;
+      background: #f0f2f5;
+    }
+    .load-header {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .load-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+    .load-header .subtitle { font-size: 12px; color: #888; }
+    .load-note {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .load-note i { color: #0078d4; }
+    .load-chart-wrap {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      padding: 24px;
+      max-width: 1000px;
+      margin-bottom: 24px;
+    }
+    .load-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .load-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      color: #444;
+    }
+    .load-legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .load-table-wrap {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      padding: 20px 24px;
+      max-width: 1000px;
+    }
+    .load-table-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .load-table-title i { color: #0078d4; }
+    .load-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    .load-table th {
+      background: #f0f2f5;
+      color: #444;
+      padding: 8px 12px;
+      text-align: center;
+      font-weight: 600;
+      border-bottom: 2px solid #ddd;
+      white-space: nowrap;
+    }
+    .load-table th:first-child { text-align: left; }
+    .load-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #f0f0f0;
+      text-align: center;
+      color: #333;
+    }
+    .load-table td:first-child { text-align: left; font-weight: 600; }
+    .load-table tr:last-child td { border-bottom: none; }
+    .load-cell-high   { background: #fce4ec; color: #c62828; font-weight: 700; border-radius: 4px; }
+    .load-cell-mid    { background: #fff8e1; color: #f57f17; font-weight: 600; border-radius: 4px; }
+    .load-cell-low    { background: #e8f5e9; color: #2e7d32; border-radius: 4px; }
+    .load-cell-empty  { color: #ccc; }
+
+    /* ─── 使い方 ─── */
+    #help {
+      display: none;
+      padding: 28px 32px;
+      height: calc(100vh - 52px);
+      overflow-y: auto;
+      background: #f0f2f5;
+    }
+    .help-page-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .help-page-title h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+    .help-page-title i { font-size: 22px; color: #0078d4; }
+    .help-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+      gap: 20px;
+      max-width: 1100px;
+    }
+    .help-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .help-card-header {
+      background: linear-gradient(135deg, #0078d4, #106ebe);
+      color: white;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .help-card-header i { font-size: 17px; }
+    .help-card-body { padding: 16px 18px; }
+    .help-step {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+      align-items: flex-start;
+    }
+    .help-step:last-child { margin-bottom: 0; }
+    .step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #0078d4;
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step-body { flex: 1; }
+    .step-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 3px;
+    }
+    .step-desc {
+      font-size: 12px;
+      color: #666;
+      line-height: 1.6;
+    }
+    .step-desc code {
+      background: #f0f2f5;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 11.5px;
+      color: #d83b01;
+      font-family: monospace;
+    }
+    .help-tip {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      background: #e8f0fe;
+      border-left: 3px solid #0078d4;
+      border-radius: 0 6px 6px 0;
+      padding: 10px 12px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: #333;
+      line-height: 1.6;
+    }
+    .help-tip i { color: #0078d4; font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+    .help-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    .help-table th {
+      background: #f0f2f5;
+      color: #444;
+      padding: 7px 10px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 2px solid #ddd;
+    }
+    .help-table td {
+      padding: 7px 10px;
+      border-bottom: 1px solid #f0f0f0;
+      color: #333;
+      vertical-align: top;
+    }
+    .help-table tr:last-child td { border-bottom: none; }
+    .help-table .req {
+      color: #c62828;
+      font-weight: 700;
+      font-size: 11px;
+    }
+    .help-table .opt {
+      color: #888;
+      font-size: 11px;
+    }
+    .faq-item {
+      margin-bottom: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .faq-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .faq-q {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 5px;
+    }
+    .faq-q i { color: #f57f17; font-size: 15px; flex-shrink: 0; }
+    .faq-a {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 12.5px;
+      color: #555;
+      line-height: 1.6;
+      padding-left: 4px;
+    }
+    .faq-a i { color: #43a047; font-size: 15px; flex-shrink: 0; }
+    .status-badge {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      margin: 1px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <div class="logo">
+    <i class="bi bi-diagram-3-fill"></i>
+  </div>
+  <h1>PROJECT GANTT</h1>
+  <div class="divider"></div>
+  <button class="tab-btn active" id="tabGantt" onclick="showTab('gantt')">
+    <i class="bi bi-bar-chart-gantt"></i> GANTT CHART
+  </button>
+  <button class="tab-btn" id="tabSummary" onclick="showTab('summary')">
+    <i class="bi bi-people-fill"></i> TASK SUMMARY
+  </button>
+  <button class="tab-btn" id="tabHelp" onclick="showTab('help')">
+    <i class="bi bi-question-circle-fill"></i> 使い方
+  </button>
+  <div class="divider"></div>
+  <label class="btn-upload" for="csvFile">
+    <i class="bi bi-upload"></i> LOAD CSV
+  </label>
+  <input type="file" id="csvFile" accept=".csv">
+  <span id="fileName"><i class="bi bi-info-circle" style="margin-right:3px;"></i>SAMPLE</span>
+</div>
+
+<div id="filterBar">
+  <span class="fb-label"><i class="bi bi-funnel-fill"></i> 絞り込み</span>
+  <input type="text" id="fTask" placeholder="タスク名で検索…" autocomplete="off">
+  <span class="fb-group">
+    難易度
+    <span class="fb-status" id="fStatus">
+      <button type="button" data-rank="1">VL</button>
+      <button type="button" data-rank="2">L</button>
+      <button type="button" data-rank="3">M</button>
+      <button type="button" data-rank="4">H</button>
+      <button type="button" data-rank="5">VH</button>
+    </span>
+  </span>
+  <span class="fb-group">
+    期間
+    <input type="date" id="fStart"> 〜 <input type="date" id="fEnd">
+  </span>
+  <button type="button" id="fClear" class="fb-clear"><i class="bi bi-x-circle"></i> クリア</button>
+  <span class="fb-count" id="fCount"></span>
+</div>
+
+<div id="vis"></div>
+<div id="summary"></div>
+<div id="load"></div>
+<div id="help"></div>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>LOADING...</p>
+</div>
+
+
+<script>
+  // ─── Embedded Vega Spec ───────────────────────────────────────────────────
+  const GANTT_SPEC = {
+  "$schema": "https://vega.github.io/schema/vega/v5.json",
+  "description": "Dataviz by David Bacci: https://www.linkedin.com/in/davbacci/",
+  "autosize": "pad",
+  "padding": {
+    "left": 5,
+    "right": 0,
+    "top": 5,
+    "bottom": 0
+  },
+  "signals": [
+    {
+      "name": "height",
+      "update": "pbiContainerHeight-65"
+    },
+    {
+      "name": "width",
+      "update": "pbiContainerWidth"
+    },
+    {
+      "name": "showTooltips",
+      "value": true
+    },
+    {
+      "name": "initDate",
+      "value": "project",
+      "description": "The initial date shown in the Gantt. Can be either 'today' or 'project'"
+    },
+    {
+      "name": "showButtons",
+      "value": true
+    },
+    {
+      "name": "showDomainSpanLabel",
+      "value": false
+    },
+    {
+      "name": "startGrain",
+      "value": "Days",
+      "description": "Days, Months, Years or All"
+    },
+    {
+      "name": "initPhaseState",
+      "value": "openRows",
+      "description": "openRows or closeRows"
+    },
+    {
+      "name": "initColumnState",
+      "value": "openColumns",
+      "description": "openColumns or closeColumns"
+    },
+    {
+      "name": "textColour",
+      "value": "#666666"
+    },
+    {
+      "name": "colours",
+      "value": {
+        "dark": [
+          "#377eb9",
+          "#4db04a",
+          "#974ea2",
+          "#ff8000",
+          "#e61a1d"
+        ],
+        "light": [
+          "#a5c8e4",
+          "#b5dfb3",
+          "#d3b0d9",
+          "#ffcc99",
+          "#f5a3a5"
+        ]
+      }
+    },
+    {
+      "name": "statusColumn",
+      "value": {
+        "domain": [
+          "Very Low",
+          "Low",
+          "Medium",
+          "High",
+          "Very High"
+        ],
+        "range": [
+          "VL",
+          "L",
+          "M",
+          "H",
+          "VH"
+        ],
+        "font": [
+          "#43864d",
+          "#43864d",
+          "#af7a37",
+          "#ad622c",
+          "#b73133"
+        ],
+        "background": [
+          "#d9f2e0",
+          "#c6efce",
+          "#ffeb9c",
+          "#f8cbad",
+          "#ffbfc1"
+        ]
+      }
+    },
+    {
+      "name": "yRowHeight",
+      "value": 33,
+      "description": "Height in pixels"
+    },
+    {
+      "name": "yRowPadding",
+      "value": 0.22,
+      "description": "Row padding as % of yRowHeight (each side)"
+    },
+    {
+      "name": "yPaddingInner",
+      "init": "yRowPadding * yRowHeight"
+    },
+    {
+      "name": "taskColumnWidth",
+      "init": "155+columnPadding"
+    },
+    {
+      "name": "startColumnWidth",
+      "init": "45+columnPadding"
+    },
+    {
+      "name": "endColumnWidth",
+      "init": "45+columnPadding"
+    },
+    {
+      "name": "daysColumnWidth",
+      "init": "35+columnPadding"
+    },
+    {
+      "name": "statusColumnWidth",
+      "init": "statusColumnPresent?47+columnPadding:0"
+    },
+    {
+      "name": "progressColumnWidth",
+      "init": "55+columnPadding"
+    },
+    {
+      "name": "columnPadding",
+      "value": 15
+    },
+    {
+      "name": "statusColumnPresent",
+      "init": "data('dataset')[0]['status']!=null"
+    },
+    {
+      "name": "oneDay",
+      "init": "1000*60*60*24"
+    },
+    {
+      "name": "timeoffset",
+      "init": "timezoneoffset(data('dataset')[0]['start']) * 60 *1000"
+    },
+    {
+      "name": "dayBandwidth",
+      "update": "scale('x', timeOffset('day', datetime(2000,1,1),1)) - scale('x', datetime(2000,1,1))"
+    },
+    {
+      "name": "dayBandwidthRound",
+      "update": "(round(dayBandwidth *100)/100)"
+    },
+    {
+      "name": "minDayBandwidth",
+      "value": 20
+    },
+    {
+      "name": "minMonthBandwidth",
+      "value": 3
+    },
+    {
+      "name": "minYearBandwidth",
+      "value": 0.95
+    },
+    {
+      "name": "milestoneSymbolSize",
+      "value": 400
+    },
+    {
+      "name": "arrowSymbolSize",
+      "value": 70
+    },
+    {
+      "name": "phaseSymbolHeight",
+      "init": "bandwidth('y')-yPaddingInner-5"
+    },
+    {
+      "name": "phaseSymbolWidth",
+      "value": 10
+    },
+    {
+      "name": "columnsWidth",
+      "update": "!showColumns?taskColumnWidth: taskColumnWidth+startColumnWidth+endColumnWidth+daysColumnWidth+statusColumnWidth+progressColumnWidth"
+    },
+    {
+      "name": "ganttWidth",
+      "update": "width-columnsWidth-minDayBandwidth"
+    },
+    {
+      "name": "dayExt",
+      "init": "initDate=='project'? [data('xExt')[0]['s']-oneDay,data('xExt')[0]['s']+ ((ganttWidth-minDayBandwidth)/minDayBandwidth)*oneDay]:[today-oneDay,today+ ((ganttWidth-minDayBandwidth)/minDayBandwidth)*oneDay]"
+    },
+    {
+      "name": "monthExt",
+      "init": "initDate=='project'? [data('xExt')[0]['s']-oneDay ,data('xExt')[0]['s'] + ganttWidth/2*oneDay]:[today-(oneDay*15) ,today + ganttWidth/2*oneDay]"
+    },
+    {
+      "name": "yearExt",
+      "init": "initDate=='project'? [data('xExt')[0]['s']-oneDay,data('xExt')[0]['s'] + ganttWidth/0.35*oneDay]:[today-(oneDay*180),today + ganttWidth/0.35*oneDay]"
+    },
+    {
+      "name": "allExt",
+      "init": "[data('xExt')[0]['s']-oneDay,data('xExt')[0]['e']+oneDay*9]"
+    },
+    {
+      "name": "xExt",
+      "update": "startGrain=='All'?allExt:startGrain=='Years'?yearExt:startGrain=='Months'?monthExt:dayExt"
+    },
+    {
+      "name": "today",
+      "init": "+datetime(year(now()),month(now()),date(now()))"
+    },
+    {
+      "name": "todayRule",
+      "init": "timeFormat(today,'%Y/%m/%d')"
+    },
+    {
+      "name": "zoom",
+      "value": 1,
+      "on": [
+        {
+          "events": "wheel!",
+          "force": true,
+          "update": "x()>columnsWidth?pow(1.001, (event.deltaY) * pow(16, event.deltaMode)):1"
+        }
+      ]
+    },
+    {
+      "name": "xDomMinSpan",
+      "update": "span(dayExt)"
+    },
+    {
+      "name": "xDomMaxSpan",
+      "update": "round((ganttWidth/0.13)*oneDay)"
+    },
+    {
+      "name": "xDom",
+      "init": "xExt",
+      "on": [
+        {
+          "events": {
+            "signal": "xDomPre"
+          },
+          "update": "span(xDomPre)<xDomMinSpan?[anchor + (xDom[0] - anchor) * (zoom*(xDomMinSpan/span(xDomPre))), anchor + (xDom[1] - anchor) * (zoom*(xDomMinSpan/span(xDomPre)))]:span(xDomPre)>xDomMaxSpan?[anchor + (xDom[0] - anchor) * (zoom*(xDomMaxSpan/span(xDomPre))), anchor + (xDom[1] - anchor) * (zoom*(xDomMaxSpan/span(xDomPre)))] :xDomPre"
+        },
+        {
+          "events": {
+            "signal": "delta"
+          },
+          "update": "[xCur[0] + span(xCur) * delta[0] / width, xCur[1] + span(xCur) * delta[0] / width]"
+        },
+        {
+          "events": "dblclick",
+          "update": "xExt"
+        },
+        {
+          "events": "@buttonMarks:click",
+          "update": "datum.name=='All'?allExt:datum.name=='Years'?yearExt:datum.name=='Months'?monthExt:datum.name=='Days'?dayExt:xDom"
+        },
+        {
+          "events": {
+            "signal": "ganttWidth"
+          },
+          "update": "[xDom[0],xDom[0]+((ganttWidth/ganttWidthOld)*span(xDom))]"
+        }
+      ]
+    },
+    {
+      "name": "ganttWidthOld",
+      "init": "ganttWidth",
+      "on": [
+        {
+          "events": {
+            "signal": "showColumns"
+          },
+          "update": "ganttWidth==ganttWidthOld?ganttWidthOld:ganttWidth"
+        }
+      ]
+    },
+    {
+      "name": "scaledHeight",
+      "update": "data('yScale').length * yRowHeight"
+    },
+    {
+      "name": "yRange",
+      "update": "[yRange!=null?yRange[0]:0,yRange!=null?yRange[0]+scaledHeight:scaledHeight]",
+      "on": [
+        {
+          "events": [
+            {
+              "signal": "delta"
+            }
+          ],
+          "update": "clampRange( [yCur[0] + span(yCur) * delta[1] / scaledHeight, yCur[1] + span(yCur) * delta[1] / scaledHeight],height>=scaledHeight?0: height-scaledHeight,height>=scaledHeight?height:scaledHeight)"
+        },
+        {
+          "events": "dblclick",
+          "update": "[0,scaledHeight]"
+        },
+        {
+          "events": {
+            "signal": "closeRowsAll"
+          },
+          "update": "closeRowsAll?[0, scaledHeight]:yRange"
+        }
+      ]
+    },
+    {
+      "name": "xDomPre",
+      "value": [
+        0,
+        0
+      ],
+      "on": [
+        {
+          "events": {
+            "signal": "zoom"
+          },
+          "update": "[anchor + (xDom[0] - anchor) * zoom, anchor + (xDom[1] - anchor) * zoom]"
+        }
+      ]
+    },
+    {
+      "name": "anchor",
+      "value": 0,
+      "on": [
+        {
+          "events": "wheel",
+          "update": "+invert('x', x()-columnsWidth)"
+        }
+      ]
+    },
+    {
+      "name": "xCur",
+      "value": [
+        0,
+        0
+      ],
+      "on": [
+        {
+          "events": "pointerdown",
+          "update": "slice(xDom)"
+        }
+      ]
+    },
+    {
+      "name": "yCur",
+      "value": [
+        0,
+        0
+      ],
+      "on": [
+        {
+          "events": "pointerdown",
+          "update": "slice(yRange)"
+        }
+      ]
+    },
+    {
+      "name": "delta",
+      "value": [
+        0,
+        0
+      ],
+      "on": [
+        {
+          "events": [
+            {
+              "source": "window",
+              "type": "pointermove",
+              "consume": true,
+              "between": [
+                {
+                  "type": "pointerdown"
+                },
+                {
+                  "source": "window",
+                  "type": "pointerup"
+                }
+              ]
+            }
+          ],
+          "update": "down ? [down[0]-x(), y()-down[1]] : [0,0]"
+        }
+      ]
+    },
+    {
+      "name": "down",
+      "value": null,
+      "on": [
+        {
+          "events": "pointerdown",
+          "update": "xy()"
+        },
+        {
+          "events": "pointerup",
+          "update": "null"
+        }
+      ]
+    },
+    {
+      "name": "projectClicked",
+      "value": null,
+      "on": [
+        {
+          "events": "@taskSelector:click,@projectOutline",
+          "update": "datum.rowType=='project' ? {projectKey: datum.projectKey} : null",
+          "force": true
+        },
+        {
+          "events": "@taskTooltips:click",
+          "update": "datum.datum.rowType=='project' ? {projectKey: datum.datum.projectKey} : null",
+          "force": true
+        }
+      ]
+    },
+    {
+      "name": "phaseClicked",
+      "value": null,
+      "on": [
+        {
+          "events": "@taskSelector:click,@phaseOutline:click",
+          "update": "datum.rowType=='phase' ? {phaseKey: datum.phaseKey} : null",
+          "force": true
+        },
+        {
+          "events": "@taskTooltips:click",
+          "update": "datum.datum.rowType=='phase' ? {phaseKey: datum.datum.phaseKey} : null",
+          "force": true
+        }
+      ]
+    },
+    {
+      "name": "categoryClicked",
+      "value": null,
+      "on": [
+        {
+          "events": "@taskSelector:click,@categoryOutline",
+          "update": "datum.rowType=='category' ? {category: datum.category} : null",
+          "force": true
+        },
+        {
+          "events": "@taskTooltips:click",
+          "update": "datum.datum.rowType=='category' ? {category: datum.datum.category} : null",
+          "force": true
+        }
+      ]
+    },
+    {
+      "name": "typeClicked",
+      "value": null,
+      "on": [
+        {
+          "events": "@taskSelector:click,@typeOutline",
+          "update": "datum.rowType=='type' ? {typeKey: datum.typeKey} : null",
+          "force": true
+        },
+        {
+          "events": "@taskTooltips:click",
+          "update": "datum.datum.rowType=='type' ? {typeKey: datum.datum.typeKey} : null",
+          "force": true
+        }
+      ]
+    },
+    {
+      "name": "itemHovered",
+      "value": {
+        "id": "",
+        "dependencies": []
+      },
+      "on": [
+        {
+          "events": "@taskSelector:mouseover,@phaseOutline:mouseover,@milestoneSymbols:mouseover,@taskBars:mouseover,@taskNames:mouseover,@taskLabels:mouseover",
+          "update": "{'id': datum.id, 'dependencies':split(datum.dependencies,',')}"
+        },
+        {
+          "events": "@taskTooltips:mouseover",
+          "update": "{'id': toString(datum.datum.id), 'dependencies':split(datum.datum.dependencies,',')}"
+        },
+        {
+          "events": "@taskSelector:mouseout,@phaseOutline:mouseout,@milestoneSymbols:mouseout,@taskBars:mouseout,@taskNames:mouseout,@taskLabels:mouseout,@taskTooltips:mouseout",
+          "update": "{'id': '', 'dependencies':[]}"
+        }
+      ]
+    },
+    {
+      "name": "hover",
+      "value": "",
+      "on": [
+        {
+          "events": "@buttonMarks:pointerover",
+          "update": "datum.name?datum.name:''",
+          "force": true
+        },
+        {
+          "events": "@buttonMarks:pointerout",
+          "update": "''",
+          "force": true
+        }
+      ]
+    },
+    {
+      "name": "showColumns",
+      "update": "initColumnState=='openColumns'?true:false",
+      "on": [
+        {
+          "events": "@buttonMarks:click",
+          "update": "datum.name=='closeColumns'?false:datum.name=='openColumns'?true:showColumns",
+          "force": true
+        }
+      ]
+    },
+    {
+      "name": "closeRowsAll",
+      "on": [
+        {
+          "events": "@buttonMarks:click",
+          "update": "datum.name=='closeRows'?true:false",
+          "force": true
+        }
+      ]
+    },
+    {
+      "name": "openRowsAll",
+      "on": [
+        {
+          "events": "@buttonMarks:click",
+          "update": "datum.name=='openRows'?true:false",
+          "force": true
+        }
+      ]
+    },
+    {
+      "name": "focusProject",
+      "value": null,
+      "on": [
+        {
+          "events": "@projectOutline:click,@taskSelector:click",
+          "update": "datum.rowType=='project' ? (focusProject==datum.project ? null : datum.project) : focusProject",
+          "force": true
+        }
+      ]
+    }
+  ],
+  "data": [
+    {
+      "name": "dataset"
+    },
+    {
+      "name": "input",
+      "source": "dataset",
+      "transform": [
+        {
+          "type": "formula",
+          "as": "category",
+          "expr": "isValid(datum.category) && datum.category != '' ? datum.category : '(未分類)'"
+        },
+        {
+          "type": "formula",
+          "as": "type",
+          "expr": "isValid(datum.type) && datum.type != '' ? datum.type : '(未分類)'"
+        },
+        {
+          "type": "formula",
+          "as": "start",
+          "expr": "+datetime(year(datum.start),month(datum.start),date(datum.start),hours(datum.start),minutes(datum.start))"
+        },
+        {
+          "type": "formula",
+          "as": "end",
+          "expr": "+datetime(year(datum.end),month(datum.end),date(datum.end),hours(datum.end),minutes(datum.end))"
+        },
+        {
+          "type": "formula",
+          "as": "labelEnd",
+          "expr": "datum.end"
+        },
+        {
+          "type": "formula",
+          "as": "end",
+          "expr": "datetime(+datum.end+oneDay)"
+        },
+        {
+          "type": "formula",
+          "as": "days",
+          "expr": "round(((datum.end-datum.start)/oneDay)*10)/10"
+        },
+        {
+          "type": "formula",
+          "as": "completionLabel",
+          "expr": "datum.completion+'%'"
+        },
+        {
+          "type": "formula",
+          "as": "status_rank",
+          "expr": "test(/very low/i, datum.status) ? 1 : test(/low/i, datum.status) ? 2 : (test(/medium/i, datum.status) || test(/midium/i, datum.status)) ? 3 : test(/high/i, datum.status) ? 4 : test(/very high/i, datum.status) ? 5 : 0"
+        },
+        {
+          "type": "formula",
+          "as": "status",
+          "expr": "datum.status_rank == 1 ? 'Very Low' : datum.status_rank == 2 ? 'Low' : datum.status_rank == 3 ? 'Medium' : datum.status_rank == 4 ? 'High' : datum.status_rank == 5 ? 'Very High' : ''"
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": "start",
+            "order": "ascending"
+          },
+          "ops": [
+            "rank"
+          ],
+          "as": [
+            "taskSort"
+          ],
+          "groupby": [
+            "phase"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "start",
+          "expr": "+datum.start"
+        },
+        {
+          "type": "formula",
+          "as": "end",
+          "expr": "+datum.end"
+        },
+        {
+          "type": "formula",
+          "as": "phaseKey",
+          "expr": "toString(datum.category) + '|' + toString(datum.project) + '|' + toString(datum.type) + '|' + toString(datum.phase)"
+        },
+        {
+          "type": "formula",
+          "as": "typeKey",
+          "expr": "toString(datum.category) + '|' + toString(datum.project) + '|' + toString(datum.type)"
+        },
+        {
+          "type": "formula",
+          "as": "projectKey",
+          "expr": "toString(datum.category) + '|' + toString(datum.project)"
+        }
+      ]
+    },
+    {
+      "name": "categories",
+      "source": "input",
+      "transform": [
+        {
+          "type": "aggregate",
+          "fields": [
+            "start",
+            "end",
+            "completion",
+            "labelEnd",
+            "status_rank"
+          ],
+          "ops": [
+            "min",
+            "max",
+            "mean",
+            "max",
+            "max"
+          ],
+          "as": [
+            "start",
+            "end",
+            "completion",
+            "labelEnd",
+            "status_rank"
+          ],
+          "groupby": [
+            "category"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "phaseKey",
+          "expr": "toString(datum.category) + '|' + toString(datum.category)"
+        },
+        {
+          "type": "formula",
+          "as": "phase",
+          "expr": "datum.category"
+        },
+        {
+          "type": "formula",
+          "as": "task",
+          "expr": "datum.category"
+        },
+        {
+          "type": "formula",
+          "as": "status",
+          "expr": "datum.status_rank == 1 ? 'Very Low' : datum.status_rank == 2 ? 'Low' : datum.status_rank == 3 ? 'Medium' : datum.status_rank == 4 ? 'High' : datum.status_rank == 5 ? 'Very High' : ''"
+        },
+        {
+          "type": "formula",
+          "as": "completion",
+          "expr": "round(datum.completion)"
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": "start",
+            "order": "ascending"
+          },
+          "ops": [
+            "row_number",
+            "row_number"
+          ],
+          "as": [
+            "categorySort",
+            "idNum"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "id",
+          "expr": "'cat' + toString(datum.idNum) + '^^^^^'"
+        },
+        {
+          "type": "formula",
+          "as": "rowType",
+          "expr": "'category'"
+        },
+        {
+          "type": "formula",
+          "as": "levelOrder",
+          "expr": "-2"
+        },
+        {
+          "type": "formula",
+          "as": "days",
+          "expr": "round(((datum.end-datum.start)/oneDay)*10)/10"
+        }
+      ]
+    },
+    {
+      "name": "collapsedCategories",
+      "on": [
+        {
+          "trigger": "categoryClicked",
+          "toggle": "categoryClicked"
+        },
+        {
+          "trigger": "closeRowsAll",
+          "remove": true
+        },
+        {
+          "trigger": "closeRowsAll",
+          "insert": "data('categories')"
+        },
+        {
+          "trigger": "openRowsAll",
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "types",
+      "source": "input",
+      "transform": [
+        {
+          "type": "aggregate",
+          "fields": [
+            "start",
+            "end",
+            "completion",
+            "labelEnd",
+            "status_rank"
+          ],
+          "ops": [
+            "min",
+            "max",
+            "mean",
+            "max",
+            "max"
+          ],
+          "as": [
+            "start",
+            "end",
+            "completion",
+            "labelEnd",
+            "status_rank"
+          ],
+          "groupby": [
+            "category",
+            "project",
+            "type",
+            "typeKey",
+            "projectKey"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "phase",
+          "expr": "datum.type"
+        },
+        {
+          "type": "formula",
+          "as": "task",
+          "expr": "datum.type"
+        },
+        {
+          "type": "formula",
+          "as": "status",
+          "expr": "datum.status_rank == 1 ? 'Very Low' : datum.status_rank == 2 ? 'Low' : datum.status_rank == 3 ? 'Medium' : datum.status_rank == 4 ? 'High' : datum.status_rank == 5 ? 'Very High' : ''"
+        },
+        {
+          "type": "formula",
+          "as": "completion",
+          "expr": "round(datum.completion)"
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": "start",
+            "order": "ascending"
+          },
+          "groupby": [
+            "projectKey"
+          ],
+          "ops": [
+            "row_number"
+          ],
+          "as": [
+            "typeSort"
+          ]
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": [
+              "projectKey",
+              "start"
+            ],
+            "order": [
+              "ascending",
+              "ascending"
+            ]
+          },
+          "ops": [
+            "row_number"
+          ],
+          "as": [
+            "idNum"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "id",
+          "expr": "'typ' + toString(datum.idNum) + '^^^^^'"
+        },
+        {
+          "type": "formula",
+          "as": "rowType",
+          "expr": "'type'"
+        },
+        {
+          "type": "formula",
+          "as": "levelOrder",
+          "expr": "0"
+        },
+        {
+          "type": "formula",
+          "as": "days",
+          "expr": "round(((datum.end-datum.start)/oneDay)*10)/10"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedCategories','category',datum.category)"
+        }
+      ]
+    },
+    {
+      "name": "collapsedTypes",
+      "on": [
+        {
+          "trigger": "typeClicked",
+          "toggle": "typeClicked"
+        },
+        {
+          "trigger": "closeRowsAll",
+          "remove": true
+        },
+        {
+          "trigger": "closeRowsAll",
+          "insert": "data('types')"
+        },
+        {
+          "trigger": "openRowsAll",
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "phases",
+      "source": "input",
+      "transform": [
+        {
+          "type": "aggregate",
+          "fields": [
+            "start",
+            "end",
+            "completion",
+            "task",
+            "completion",
+            "labelEnd",
+            "status_rank"
+          ],
+          "ops": [
+            "min",
+            "max",
+            "sum",
+            "count",
+            "mean",
+            "max",
+            "max"
+          ],
+          "as": [
+            "start",
+            "end",
+            "sum",
+            "count",
+            "completion",
+            "labelEnd",
+            "status_rank"
+          ],
+          "groupby": [
+            "category",
+            "project",
+            "type",
+            "phase"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "task",
+          "expr": "datum.phase"
+        },
+        {
+          "type": "formula",
+          "as": "phaseKey",
+          "expr": "toString(datum.category) + '|' + toString(datum.project) + '|' + toString(datum.type) + '|' + toString(datum.phase)"
+        },
+        {
+          "type": "formula",
+          "as": "typeKey",
+          "expr": "toString(datum.category) + '|' + toString(datum.project) + '|' + toString(datum.type)"
+        },
+        {
+          "type": "formula",
+          "as": "projectKey",
+          "expr": "toString(datum.category) + '|' + toString(datum.project)"
+        },
+        {
+          "type": "formula",
+          "as": "taskSort",
+          "expr": "0"
+        },
+        {
+          "type": "formula",
+          "as": "status",
+          "expr": "datum.status_rank == 1 ? 'Very Low' : datum.status_rank == 2 ? 'Low' : datum.status_rank == 3 ? 'Medium' : datum.status_rank == 4 ? 'High' : datum.status_rank == 5 ? 'Very High' : ''"
+        },
+        {
+          "type": "formula",
+          "as": "completion",
+          "expr": "round(datum.completion)"
+        },
+        {
+          "type": "formula",
+          "as": "days",
+          "expr": "round(((datum.end-datum.start)/oneDay)*10)/10"
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": "start",
+            "order": "ascending"
+          },
+          "groupby": [
+            "typeKey"
+          ],
+          "ops": [
+            "row_number"
+          ],
+          "as": [
+            "phaseSort"
+          ]
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": [
+              "projectKey",
+              "start"
+            ],
+            "order": [
+              "ascending",
+              "ascending"
+            ]
+          },
+          "ops": [
+            "row_number"
+          ],
+          "as": [
+            "idNum"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "id",
+          "expr": "'ph' + toString(datum.idNum) + '^^^^^'"
+        },
+        {
+          "type": "formula",
+          "as": "rowType",
+          "expr": "'phase'"
+        },
+        {
+          "type": "formula",
+          "as": "levelOrder",
+          "expr": "1"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedCategories','category',datum.category)"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedTypes','typeKey',datum.typeKey)"
+        },
+        {
+          "type": "filter",
+          "expr": "focusProject==null || datum.project==focusProject"
+        }
+      ]
+    },
+    {
+      "name": "phaseKeyList",
+      "source": "phases",
+      "transform": [
+        {
+          "type": "project",
+          "fields": [
+            "phaseKey"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "projects",
+      "source": "input",
+      "transform": [
+        {
+          "type": "aggregate",
+          "fields": [
+            "start",
+            "end",
+            "completion",
+            "labelEnd",
+            "status_rank"
+          ],
+          "ops": [
+            "min",
+            "max",
+            "mean",
+            "max",
+            "max"
+          ],
+          "as": [
+            "start",
+            "end",
+            "completion",
+            "labelEnd",
+            "status_rank"
+          ],
+          "groupby": [
+            "category",
+            "project"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "phaseKey",
+          "expr": "toString(datum.category) + '|' + toString(datum.project) + '|' + toString(datum.phase)"
+        },
+        {
+          "type": "formula",
+          "as": "projectKey",
+          "expr": "toString(datum.category) + '|' + toString(datum.project)"
+        },
+        {
+          "type": "formula",
+          "as": "phase",
+          "expr": "datum.project"
+        },
+        {
+          "type": "formula",
+          "as": "task",
+          "expr": "datum.project"
+        },
+        {
+          "type": "formula",
+          "as": "status",
+          "expr": "datum.status_rank == 1 ? 'Very Low' : datum.status_rank == 2 ? 'Low' : datum.status_rank == 3 ? 'Medium' : datum.status_rank == 4 ? 'High' : datum.status_rank == 5 ? 'Very High' : ''"
+        },
+        {
+          "type": "formula",
+          "as": "completion",
+          "expr": "round(datum.completion)"
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": "start",
+            "order": "ascending"
+          },
+          "ops": [
+            "row_number",
+            "row_number"
+          ],
+          "as": [
+            "projectSort",
+            "idNum"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "id",
+          "expr": "'prj' + toString(datum.idNum) + '^^^^^'"
+        },
+        {
+          "type": "formula",
+          "as": "rowType",
+          "expr": "'project'"
+        },
+        {
+          "type": "formula",
+          "as": "levelOrder",
+          "expr": "-1"
+        },
+        {
+          "type": "formula",
+          "as": "days",
+          "expr": "round(((datum.end-datum.start)/oneDay)*10)/10"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedCategories','category',datum.category)"
+        },
+        {
+          "type": "filter",
+          "expr": "focusProject==null || datum.project==focusProject"
+        }
+      ]
+    },
+    {
+      "name": "collapsedProjects",
+      "on": [
+        {
+          "trigger": "projectClicked",
+          "toggle": "projectClicked"
+        },
+        {
+          "trigger": "closeRowsAll",
+          "remove": true
+        },
+        {
+          "trigger": "closeRowsAll",
+          "insert": "data('projects')"
+        },
+        {
+          "trigger": "openRowsAll",
+          "remove": true
+        }
+      ]
+    },
+    {
+      "name": "collapsedPhases",
+      "on": [
+        {
+          "trigger": "phaseClicked",
+          "toggle": "phaseClicked"
+        },
+        {
+          "trigger": "initPhaseState",
+          "insert": "initPhaseState=='closeRows'? data('phaseKeyList'):null"
+        },
+        {
+          "trigger": "openRowsAll",
+          "remove": true
+        },
+        {
+          "trigger": "closeRowsAll",
+          "remove": true
+        },
+        {
+          "trigger": "closeRowsAll",
+          "insert": "data('phaseKeyList')"
+        }
+      ]
+    },
+    {
+      "name": "tasks",
+      "source": "input",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.milestone != true"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedPhases', 'phaseKey', datum.phaseKey)"
+        },
+        {
+          "type": "formula",
+          "as": "rowType",
+          "expr": "datum.milestone == true ? 'milestone' : 'task'"
+        },
+        {
+          "type": "formula",
+          "as": "levelOrder",
+          "expr": "2"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedProjects', 'projectKey', datum.projectKey)"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedCategories', 'category', datum.category)"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedTypes', 'typeKey', datum.typeKey)"
+        },
+        {
+          "type": "filter",
+          "expr": "focusProject==null || datum.project==focusProject"
+        }
+      ]
+    },
+    {
+      "name": "milestones",
+      "source": "input",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.milestone == true"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedPhases', 'phaseKey', datum.phaseKey)"
+        },
+        {
+          "type": "formula",
+          "as": "rowType",
+          "expr": "'milestone'"
+        },
+        {
+          "type": "formula",
+          "as": "levelOrder",
+          "expr": "2"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedProjects', 'projectKey', datum.projectKey)"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedCategories', 'category', datum.category)"
+        },
+        {
+          "type": "filter",
+          "expr": "!indata('collapsedTypes', 'typeKey', datum.typeKey)"
+        },
+        {
+          "type": "filter",
+          "expr": "focusProject==null || datum.project==focusProject"
+        }
+      ]
+    },
+    {
+      "name": "yScale",
+      "source": [
+        "categories",
+        "types",
+        "tasks",
+        "phases",
+        "milestones",
+        "projects"
+      ],
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "phases",
+          "key": "phaseKey",
+          "values": [
+            "phaseSort"
+          ],
+          "as": [
+            "phaseSort"
+          ],
+          "fields": [
+            "phaseKey"
+          ]
+        },
+        {
+          "type": "lookup",
+          "from": "types",
+          "key": "typeKey",
+          "values": [
+            "typeSort"
+          ],
+          "as": [
+            "typeSort"
+          ],
+          "fields": [
+            "typeKey"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "datum.rowType == 'category' || datum.rowType == 'project' || !indata('collapsedProjects','projectKey', datum.projectKey)"
+        },
+        {
+          "type": "window",
+          "sort": {
+            "field": [
+              "category",
+              "project",
+              "typeSort",
+              "phaseSort",
+              "levelOrder",
+              "taskSort"
+            ],
+            "order": [
+              "ascending",
+              "ascending",
+              "ascending",
+              "ascending",
+              "ascending",
+              "ascending"
+            ]
+          },
+          "ops": [
+            "row_number"
+          ],
+          "as": [
+            "finalSort"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "focusProject==null || datum.project==focusProject || datum.rowType=='category'"
+        }
+      ]
+    },
+    {
+      "name": "yScaleIds",
+      "source": "yScale",
+      "transform": [
+        {
+          "type": "project",
+          "fields": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "phasePaths",
+      "source": [
+        "phases"
+      ],
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "indata('yScale','id',datum.id)"
+        },
+        {
+          "type": "formula",
+          "as": "phasePath",
+          "expr": "'M ' + scale('x', datum.start)+' '  +   (scale('y', datum.id)+yPaddingInner) + ' H ' +  scale('x', datum.end)+' '   + ' v ' +  phaseSymbolHeight + ' L ' +  (scale('x', datum.end) - phaseSymbolWidth) +' '  +   (scale('y', datum.id)+yPaddingInner+phaseSymbolHeight/2 ) + ' L ' +  (scale('x', datum.start)+phaseSymbolWidth) + ' '  +   (scale('y', datum.id)+yPaddingInner+phaseSymbolHeight/2) + ' L ' +  (scale('x', datum.start)) + ' '  +   (scale('y', datum.id)+ yPaddingInner+phaseSymbolHeight) + ' z'"
+        }
+      ]
+    },
+    {
+      "name": "projectPaths",
+      "source": [
+        "projects"
+      ],
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "indata('yScale','id',datum.id)"
+        },
+        {
+          "type": "formula",
+          "as": "phasePath",
+          "expr": "'M ' + scale('x', datum.start)+' '  +   (scale('y', datum.id)+yPaddingInner) + ' H ' +  scale('x', datum.end)+' '   + ' v ' +  phaseSymbolHeight + ' L ' +  (scale('x', datum.end) - phaseSymbolWidth) +' '  +   (scale('y', datum.id)+yPaddingInner+phaseSymbolHeight/2 ) + ' L ' +  (scale('x', datum.start)+phaseSymbolWidth) + ' '  +   (scale('y', datum.id)+yPaddingInner+phaseSymbolHeight/2) + ' L ' +  (scale('x', datum.start)) + ' '  +   (scale('y', datum.id)+ yPaddingInner+phaseSymbolHeight) + ' z'"
+        }
+      ]
+    },
+    {
+      "name": "categoryPaths",
+      "source": [
+        "categories"
+      ],
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "indata('yScale','id',datum.id)"
+        },
+        {
+          "type": "formula",
+          "as": "phasePath",
+          "expr": "'M ' + scale('x', datum.start)+' '  +   (scale('y', datum.id)+yPaddingInner) + ' H ' +  scale('x', datum.end)+' '   + ' v ' +  phaseSymbolHeight + ' L ' +  (scale('x', datum.end) - phaseSymbolWidth) +' '  +   (scale('y', datum.id)+yPaddingInner+phaseSymbolHeight/2 ) + ' L ' +  (scale('x', datum.start)+phaseSymbolWidth) + ' '  +   (scale('y', datum.id)+yPaddingInner+phaseSymbolHeight/2) + ' L ' +  (scale('x', datum.start)) + ' '  +   (scale('y', datum.id)+ yPaddingInner+phaseSymbolHeight) + ' z'"
+        }
+      ]
+    },
+    {
+      "name": "typePaths",
+      "source": [
+        "types"
+      ],
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "indata('yScale','id',datum.id)"
+        },
+        {
+          "type": "formula",
+          "as": "phasePath",
+          "expr": "'M ' + scale('x', datum.start)+' '  +   (scale('y', datum.id)+yPaddingInner) + ' H ' +  scale('x', datum.end)+' '   + ' v ' +  phaseSymbolHeight + ' L ' +  (scale('x', datum.end) - phaseSymbolWidth) +' '  +   (scale('y', datum.id)+yPaddingInner+phaseSymbolHeight/2 ) + ' L ' +  (scale('x', datum.start)+phaseSymbolWidth) + ' '  +   (scale('y', datum.id)+yPaddingInner+phaseSymbolHeight/2) + ' L ' +  (scale('x', datum.start)) + ' '  +   (scale('y', datum.id)+ yPaddingInner+phaseSymbolHeight) + ' z'"
+        }
+      ]
+    },
+    {
+      "name": "xExt",
+      "source": "input",
+      "transform": [
+        {
+          "type": "aggregate",
+          "fields": [
+            "start",
+            "end"
+          ],
+          "ops": [
+            "min",
+            "max"
+          ],
+          "as": [
+            "s",
+            "e"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "days",
+          "expr": "(datum.e-datum.s)/oneDay"
+        }
+      ]
+    },
+    {
+      "name": "weekends",
+      "transform": [
+        {
+          "type": "sequence",
+          "start": 0,
+          "stop": {
+            "signal": "dayBandwidthRound>=minMonthBandwidth? span(xDom)/oneDay:0"
+          },
+          "as": "sequence"
+        },
+        {
+          "type": "formula",
+          "as": "start",
+          "expr": "(+datetime(year(xDom[0]),month(xDom[0]),date(xDom[0]))-timeoffset)   +(oneDay*datum.sequence)"
+        },
+        {
+          "type": "filter",
+          "expr": "day(datum.start) == 6 || day(datum.start) == 0 "
+        },
+        {
+          "type": "formula",
+          "as": "end",
+          "expr": "datetime(+datum.start+(oneDay))"
+        }
+      ]
+    },
+    {
+      "name": "taskDependencyArrows",
+      "source": "yScale",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum.dependencies) && datum.dependencies!='' "
+        }
+      ]
+    },
+    {
+      "name": "phaseDependencyArrows",
+      "source": "input",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "indata('collapsedPhases', 'phaseKey', datum.phaseKey)"
+        },
+        {
+          "type": "joinaggregate",
+          "fields": [
+            "id",
+            "start"
+          ],
+          "ops": [
+            "values",
+            "min"
+          ],
+          "as": [
+            "allPhaseIds",
+            "start"
+          ],
+          "groupby": [
+            "phase"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "id",
+          "expr": "toString(datum.id)"
+        },
+        {
+          "type": "formula",
+          "as": "allPhaseIds",
+          "expr": "pluck(datum.allPhaseIds, 'id')"
+        },
+        {
+          "type": "formula",
+          "as": "dependencies",
+          "expr": "split(datum.dependencies,',')"
+        },
+        {
+          "type": "flatten",
+          "fields": [
+            "dependencies"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "internalDependenciesIndex",
+          "expr": "indexof(datum.allPhaseIds,datum.dependencies)"
+        },
+        {
+          "type": "formula",
+          "as": "milestone",
+          "expr": "null"
+        },
+        {
+          "type": "filter",
+          "expr": "datum.dependencies!='null' && datum.dependencies!='' && datum.dependencies!='undefined' && datum.internalDependenciesIndex == -1 "
+        },
+        {
+          "type": "lookup",
+          "from": "phases",
+          "key": "phase",
+          "values": [
+            "id"
+          ],
+          "fields": [
+            "phase"
+          ],
+          "as": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dependencyArrows",
+      "source": [
+        "taskDependencyArrows",
+        "phaseDependencyArrows"
+      ]
+    },
+    {
+      "name": "dependencyLines",
+      "source": [
+        "yScale",
+        "phaseDependencyArrows"
+      ],
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum.dependencies) && datum.dependencies!='' "
+        },
+        {
+          "type": "formula",
+          "as": "dependencies",
+          "expr": "split(datum.dependencies,',')"
+        },
+        {
+          "type": "flatten",
+          "fields": [
+            "dependencies"
+          ]
+        },
+        {
+          "type": "lookup",
+          "from": "input",
+          "key": "id",
+          "values": [
+            "id",
+            "end",
+            "phase",
+            "project",
+            "category",
+            "milestone"
+          ],
+          "fields": [
+            "dependencies"
+          ],
+          "as": [
+            "sourceId",
+            "sourceEnd",
+            "sourceProject",
+            "sourcePhase",
+            "sourceCategory",
+            "sourceMilestone"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "sourcePhaseKey",
+          "expr": "toString(datum.sourceCategory) + '|' + toString(datum.sourceProject) + '|' + toString(datum.sourcePhase)"
+        },
+        {
+          "type": "lookup",
+          "from": "phases",
+          "key": "phaseKey",
+          "values": [
+            "id",
+            "end"
+          ],
+          "fields": [
+            "sourcePhaseKey"
+          ],
+          "as": [
+            "sourcePhaseId",
+            "sourcePhaseEnd"
+          ]
+        },
+        {
+          "type": "formula",
+          "as": "sourceId",
+          "expr": "indata('collapsedPhases', 'phaseKey', datum.sourcePhaseKey) == true?datum.sourcePhaseId:datum.sourceId"
+        },
+        {
+          "type": "formula",
+          "as": "sourceEnd",
+          "expr": "indata('collapsedPhases', 'phaseKey', datum.sourcePhaseKey) == true?datum.sourcePhaseEnd:datum.sourceEnd"
+        },
+        {
+          "type": "formula",
+          "as": "plottedStart",
+          "expr": "datum.milestone == null || datum.milestone == false?scale('x',datum.start)- sqrt(arrowSymbolSize) - 1:(scale('x',datum.start) +(dayBandwidth/2) - (sqrt(milestoneSymbolSize)/2) - sqrt(arrowSymbolSize)) - 1"
+        },
+        {
+          "type": "formula",
+          "as": "plottedSourceEnd",
+          "expr": "scale('x',datum.sourceEnd) - (dayBandwidth/2) "
+        },
+        {
+          "type": "formula",
+          "as": "a",
+          "expr": "[datum.milestone == null || datum.milestone == false?scale('x',datum.start):scale('x',datum.start) +(dayBandwidth/2) - (sqrt(milestoneSymbolSize)/2)  ,scale('y', datum.id)+bandwidth('y')/2 ]"
+        },
+        {
+          "type": "formula",
+          "as": "b",
+          "expr": "[datum.plottedStart >= datum.plottedSourceEnd?datum.plottedSourceEnd :datum.plottedStart ,scale('y', datum.id)+bandwidth('y')/2]"
+        },
+        {
+          "type": "formula",
+          "as": "c",
+          "expr": "[datum.plottedSourceEnd,scale('y',datum.sourceId)+bandwidth('y')/2]"
+        },
+        {
+          "type": "formula",
+          "as": "d",
+          "expr": "[datum.plottedStart > datum.plottedSourceEnd?null:datum.plottedStart ,datum.plottedStart > datum.plottedSourceEnd?null:scale('y',datum.sourceId)+(bandwidth('y'))]"
+        },
+        {
+          "type": "formula",
+          "as": "e",
+          "expr": "[datum.plottedStart > datum.plottedSourceEnd?null:datum.plottedSourceEnd,datum.plottedStart > datum.plottedSourceEnd?null:scale('y',datum.sourceId)+(bandwidth('y'))]"
+        },
+        {
+          "type": "fold",
+          "fields": [
+            "a",
+            "b",
+            "d",
+            "e",
+            "c"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "datum.value[0] != null"
+        },
+        {
+          "type": "formula",
+          "as": "value0",
+          "expr": "datum.value[0]"
+        },
+        {
+          "type": "formula",
+          "as": "value1",
+          "expr": "datum.value[1]"
+        },
+        {
+          "type": "window",
+          "ops": [
+            "row_number"
+          ],
+          "as": [
+            "duplicates"
+          ],
+          "groupby": [
+            "id",
+            "sourceId",
+            "value0",
+            "value1"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "datum.duplicates == 1"
+        }
+      ]
+    },
+    {
+      "name": "buttons",
+      "values": [
+        {
+          "side": "left",
+          "text": "",
+          "name": "closeRows",
+          "x": 15,
+          "leftRadius": 4,
+          "icon": "m0 0-3.6294 3.6294q-.0706.0706-.1206.0806-.05.01-.14-.08t-.095-.13q-.005-.04.0966-.1416l3.5466-3.5466q.1518-.1518.3428-.1518.1908 0 .349.15l3.55 3.55q.07.08.075.12t-.085.13q-.09.09-.13.09t-.1306-.0906l-3.6294-3.6094z"
+        },
+        {
+          "side": "left",
+          "text": "",
+          "name": "openRows",
+          "x": 45,
+          "rightRadius": 4,
+          "icon": "m0 6 3.63-3.65q.07-.07.135-.07t.135.07q.09.09.09.135t-.09.135l-3.55 3.55q-.08.07-.165.115t-.185.045q-.1 0-.185-.045t-.155-.115l-3.55-3.55q-.08-.07-.065-.135t.085-.135q.09-.09.13-.09t.14.09l3.6 3.65zm0-5.51 3.63-3.65q.07-.07.135-.07t.135.07q.09.09.09.135t-.09.135l-3.55 3.55q-.08.07-.165.115t-.185.045q-.1 0-.185-.045t-.155-.115l-3.55-3.55q-.08-.07-.065-.135t.085-.135q.09-.09.13-.09t.14.09l3.6 3.65z"
+        },
+        {
+          "side": "left",
+          "text": "",
+          "name": "closeColumns",
+          "x": 105,
+          "leftRadius": 4,
+          "icon": "m-1 1 3.63 3.63q.07.07.08.12t-.08.14q-.09.09-.13.095t-.1368-.1018l-3.5432-3.5432q-.08-.078-.12-.159-.04-.081-.04-.185t.04-.185q.04-.081.12-.161l3.5432-3.5432q.0768-.0768.1268-.0818t.14.085q.09.09.09.13t-.09.13l-3.63 3.63z"
+        },
+        {
+          "side": "left",
+          "text": "",
+          "name": "openColumns",
+          "x": 135,
+          "rightRadius": 4,
+          "icon": "m0 1-3.65-3.63q-.08-.07-.075-.135t.075-.135q.09-.09.13-.09t.14.09l3.55 3.55q.07.08.115.165t.045.185q0 .1-.045.185t-.115.155l-3.55 3.55q-.08.08-.135.065t-.115-.085q-.1-.09-.1-.13t.1-.14l3.63-3.6zm4.91 0-3.65-3.63q-.08-.07-.075-.135t.075-.135q.09-.09.13-.09t.14.09l3.55 3.55q.07.08.115.165t.045.185q0 .1-.045.185t-.115.155l-3.55 3.55q-.08.08-.135.065t-.115-.085q-.1-.09-.1-.13t.1-.14l3.63-3.6z"
+        },
+        {
+          "side": "right",
+          "text": "All",
+          "name": "All",
+          "x": 50,
+          "rightRadius": 4
+        },
+        {
+          "side": "right",
+          "text": "Years",
+          "name": "Years",
+          "x": 100
+        },
+        {
+          "side": "right",
+          "text": "Months",
+          "name": "Months",
+          "x": 150
+        },
+        {
+          "side": "right",
+          "text": "Days",
+          "name": "Days",
+          "x": 200,
+          "leftRadius": 4
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "buttonMarks",
+      "description": "All buttons",
+      "type": "group",
+      "from": {
+        "data": "buttons"
+      },
+      "clip": {
+        "signal": "!showButtons"
+      },
+      "encode": {
+        "update": {
+          "x": {
+            "signal": "datum.side=='left'?datum.x:columnsWidth+ganttWidth-datum.x"
+          },
+          "width": {
+            "signal": "datum.side=='left'?30:50"
+          },
+          "y": {
+            "value": -60
+          },
+          "height": {
+            "signal": "18"
+          },
+          "stroke": {
+            "signal": "'#7f7f7f'"
+          },
+          "strokeWidth": {
+            "value": 1
+          },
+          "cornerRadiusTopLeft": {
+            "field": "leftRadius"
+          },
+          "cornerRadiusBottomLeft": {
+            "field": "leftRadius"
+          },
+          "cornerRadiusTopRight": {
+            "field": "rightRadius"
+          },
+          "cornerRadiusBottomRight": {
+            "field": "rightRadius"
+          },
+          "cursor": {
+            "value": "pointer"
+          },
+          "fill": [
+            {
+              "test": "indexof( hover,datum.name)>-1",
+              "value": "#4e95d9"
+            },
+            {
+              "test": "datum.name=='closeRows' && data('collapsedPhases').length == data('phases').length",
+              "value": "#4e95d9"
+            },
+            {
+              "test": "datum.name=='closeColumns' && !showColumns",
+              "value": "#4e95d9"
+            },
+            {
+              "test": "datum.name=='openColumns' && showColumns",
+              "value": "#4e95d9"
+            },
+            {
+              "test": "datum.name=='openRows' && data('collapsedPhases').length == 0",
+              "value": "#4e95d9"
+            },
+            {
+              "test": "datum.name=='Days' && dayBandwidthRound == minDayBandwidth",
+              "value": "#4e95d9"
+            },
+            {
+              "test": "datum.name=='Months' && dayBandwidthRound>=minYearBandwidth && dayBandwidthRound<minDayBandwidth",
+              "value": "#4e95d9"
+            },
+            {
+              "test": "datum.name=='Years' && dayBandwidthRound<minYearBandwidth",
+              "value": "#4e95d9"
+            },
+            {
+              "value": "white"
+            }
+          ]
+        }
+      },
+      "marks": [
+        {
+          "name": "buttonText",
+          "interactive": false,
+          "type": "text",
+          "encode": {
+            "update": {
+              "text": {
+                "signal": "parent.text"
+              },
+              "baseline": {
+                "value": "middle"
+              },
+              "align": {
+                "value": "center"
+              },
+              "x": {
+                "signal": "item.mark.group.width/2"
+              },
+              "y": {
+                "signal": "10"
+              },
+              "fill": [
+                {
+                  "test": "indexof( hover,parent.text)>-1",
+                  "value": "white"
+                },
+                {
+                  "test": "parent.text=='closeRows' && data('collapsedPhases').length == data('phases').length",
+                  "value": "white"
+                },
+                {
+                  "test": "parent.text=='openRows' && data('collapsedPhases').length == 0",
+                  "value": "white"
+                },
+                {
+                  "test": "parent.text=='Days' && dayBandwidthRound == minDayBandwidth",
+                  "value": "white"
+                },
+                {
+                  "test": "parent.text=='Months' && dayBandwidthRound>=minYearBandwidth && dayBandwidthRound<minDayBandwidth",
+                  "value": "white"
+                },
+                {
+                  "test": "parent.text=='Years' && dayBandwidthRound<minYearBandwidth",
+                  "value": "white"
+                },
+                {
+                  "value": "#7f7f7f"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "buttonIcons",
+          "interactive": false,
+          "type": "path",
+          "encode": {
+            "update": {
+              "path": {
+                "signal": "parent.icon"
+              },
+              "x": {
+                "signal": "item.mark.group.width/2"
+              },
+              "y": {
+                "signal": "8"
+              },
+              "stroke": [
+                {
+                  "test": "indexof( hover,parent.name)>-1",
+                  "value": "white"
+                },
+                {
+                  "test": "parent.name=='closeColumns' && !showColumns",
+                  "value": "white"
+                },
+                {
+                  "test": "parent.name=='openColumns' && showColumns",
+                  "value": "white"
+                },
+                {
+                  "test": "parent.name=='closeRows' && data('collapsedPhases').length == data('phases').length",
+                  "value": "white"
+                },
+                {
+                  "test": "parent.name=='openRows' && data('collapsedPhases').length == 0",
+                  "value": "white"
+                },
+                {
+                  "value": "#7f7f7f"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "xDomainText",
+      "data": [
+        {}
+      ],
+      "interactive": false,
+      "type": "text",
+      "encode": {
+        "update": {
+          "text": {
+            "signal": "showDomainSpanLabel?timeFormat(xDom[0],'%Y/%m/%d') +' - ' + timeFormat(xDom[1],'%Y/%m/%d'):null"
+          },
+          "baseline": {
+            "value": "bottom"
+          },
+          "align": {
+            "value": "right"
+          },
+          "x": {
+            "signal": "columnsWidth+ganttWidth-220"
+          },
+          "y": {
+            "signal": "-45"
+          },
+          "fill": {
+            "signal": "textColour"
+          }
+        }
+      }
+    },
+    {
+      "name": "phaseBackgrounds",
+      "description": "Background rect for phases",
+      "type": "rect",
+      "clip": true,
+      "zindex": 0,
+      "from": {
+        "data": "phases"
+      },
+      "encode": {
+        "update": {
+          "x": {
+            "value": 0
+          },
+          "x2": {
+            "signal": "columnsWidth"
+          },
+          "y": {
+            "signal": "scale('y', datum.id)"
+          },
+          "height": {
+            "signal": "bandwidth('y')"
+          },
+          "fill": {
+            "value": "#dceaf7"
+          },
+          "opacity": {
+            "value": 0.3
+          }
+        }
+      }
+    },
+    {
+      "name": "taskLabelSizes",
+      "description": "Hidden label sizes to support tooltips when the task name doesn't completely fit",
+      "type": "text",
+      "clip": true,
+      "from": {
+        "data": "yScale"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "value": -100
+          },
+          "y": {
+            "value": -100
+          },
+          "fill": {
+            "value": "transparent"
+          },
+          "fontSize": {
+            "value": 11
+          },
+          "text": {
+            "signal": "datum.phase == datum.task?upper(datum.task):datum.task"
+          },
+          "font": {
+            "signal": "datum.phase == datum.task?'Arial':'Segoe UI'"
+          },
+          "fontWeight": {
+            "signal": "datum.phase == datum.task?'bold':'normal'"
+          }
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "name": "taskTooltips",
+      "description": "Hidden rect to support tooltips when the task name doesn't completely fit",
+      "from": {
+        "data": "taskLabelSizes"
+      },
+      "clip": true,
+      "zindex": 101,
+      "encode": {
+        "update": {
+          "x": {
+            "value": -15
+          },
+          "x2": {
+            "signal": "taskColumnWidth"
+          },
+          "y": {
+            "signal": "scale('y', datum.datum.id)"
+          },
+          "height": {
+            "signal": "bandwidth('y')"
+          },
+          "fill": {
+            "value": "transparent"
+          },
+          "tooltip": {
+            "signal": "datum.bounds.x2 - datum.bounds.x1>=taskColumnWidth-columnPadding-16? datum.datum.task:null"
+          },
+          "cursor": {
+            "signal": "datum.datum.phase == datum.datum.task?'pointer':'auto'"
+          },
+          "href": {
+            "field": "datum.hyperlink"
+          }
+        }
+      }
+    },
+    {
+      "type": "group",
+      "name": "columnHolder",
+      "style": "cell",
+      "layout": {
+        "bounds": "flush",
+        "align": "each"
+      },
+      "encode": {
+        "update": {
+          "x": {
+            "signal": "0"
+          },
+          "stroke": {
+            "value": "transparent"
+          },
+          "width": {
+            "signal": "columnsWidth"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "type": "group",
+          "name": "taskColumnWidth",
+          "title": {
+            "text": "Task",
+            "anchor": "start",
+            "frame": "group",
+            "align": "left",
+            "dx": 16
+          },
+          "encode": {
+            "enter": {
+              "stroke": {
+                "value": ""
+              },
+              "width": {
+                "signal": "taskColumnWidth"
+              },
+              "height": {
+                "signal": "height"
+              }
+            }
+          },
+          "marks": [
+            {
+              "type": "text",
+              "style": "col",
+              "clip": true,
+              "from": {
+                "data": "yScale"
+              },
+              "encode": {
+                "update": {
+                  "align": {
+                    "value": "left"
+                  },
+                  "dx": {
+                    "value": 16
+                  },
+                  "y": {
+                    "signal": "scale('y', datum.id)+bandwidth('y')/2"
+                  },
+                  "text": {
+                    "signal": "datum.phase == datum.task?upper(datum.task):datum.task"
+                  },
+                  "font": {
+                    "signal": "datum.phase == datum.task?'Arial':'Segoe UI'"
+                  },
+                  "fontWeight": {
+                    "signal": "datum.phase == datum.task?'bold':'normal'"
+                  },
+                  "limit": {
+                    "signal": "taskColumnWidth-16-columnPadding"
+                  },
+                  "fill": {
+                    "signal": "datum.id == itemHovered.id  ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):textColour"
+                  }
+                }
+              }
+            },
+            {
+              "type": "symbol",
+              "clip": true,
+              "from": {
+                "data": "yScale"
+              },
+              "encode": {
+                "update": {
+                  "fill": {
+                    "signal": "(datum.rowType == 'project' || datum.phase == datum.task) ? (datum.id == itemHovered.id ? merge(hsl(scale('cDark', datum.phase)), {l:0.40}) : scale('cDark', datum.phase)) : 'transparent'"
+                  },
+                  "x": {
+                    "signal": "sqrt(90)/2"
+                  },
+                  "size": {
+                    "value": 90
+                  },
+                  "yc": {
+                    "signal": "(scale('y', datum.id)+bandwidth('y')/2)-1"
+                  },
+                  "shape": {
+                    "signal": "datum.rowType == 'category' && !indata('collapsedCategories','category', datum.category) ? 'triangle-down': datum.rowType == 'category' && indata('collapsedCategories','category', datum.category) ? 'triangle-right': datum.rowType == 'project' && !indata('collapsedProjects','projectKey', datum.projectKey) ? 'triangle-down': datum.rowType == 'project' &&  indata('collapsedProjects','projectKey', datum.projectKey) ? 'triangle-right': datum.rowType == 'type' && !indata('collapsedTypes','typeKey', datum.typeKey) ? 'triangle-down': datum.rowType == 'type' &&  indata('collapsedTypes','typeKey', datum.typeKey) ? 'triangle-right': datum.rowType != 'type' && datum.phase == datum.task && !indata('collapsedPhases','phaseKey', datum.phaseKey) ? 'triangle-down' : datum.rowType != 'type' && datum.phase == datum.task &&  indata('collapsedPhases','phaseKey', datum.phaseKey) ? 'triangle-right': ''"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "name": "startColumnWidth",
+          "clip": {
+            "signal": "!showColumns"
+          },
+          "title": {
+            "text": {
+              "signal": "'Start'"
+            },
+            "anchor": "middle",
+            "dx": {
+              "signal": "-(columnPadding/2)"
+            },
+            "frame": "group",
+            "align": "center"
+          },
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "startColumnWidth"
+              },
+              "height": {
+                "signal": "height"
+              },
+              "stroke": {
+                "value": ""
+              }
+            }
+          },
+          "marks": [
+            {
+              "type": "text",
+              "style": "col",
+              "clip": true,
+              "from": {
+                "data": "yScale"
+              },
+              "encode": {
+                "update": {
+                  "align": {
+                    "value": "center"
+                  },
+                  "x": {
+                    "signal": "(startColumnWidth-columnPadding)/2"
+                  },
+                  "y": {
+                    "signal": "scale('y', datum.id)+bandwidth('y')/2"
+                  },
+                  "text": {
+                    "signal": "timeFormat(datum.start,' %Y/%m/%d')"
+                  },
+                  "font": {
+                    "signal": "datum.phase == datum.task?'Arial':'Segoe UI'"
+                  },
+                  "fontWeight": {
+                    "signal": "datum.phase == datum.task?'bold':'normal'"
+                  },
+                  "fill": {
+                    "signal": "datum.id == itemHovered.id  ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):textColour"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "name": "endColumnWidth",
+          "clip": {
+            "signal": "!showColumns"
+          },
+          "title": {
+            "text": {
+              "signal": "'End'"
+            },
+            "anchor": "middle",
+            "dx": {
+              "signal": "-(columnPadding/2)"
+            },
+            "frame": "group",
+            "align": "center"
+          },
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "endColumnWidth"
+              },
+              "stroke": {
+                "value": "transparent"
+              },
+              "height": {
+                "signal": "height"
+              }
+            }
+          },
+          "marks": [
+            {
+              "type": "text",
+              "style": "col",
+              "clip": true,
+              "from": {
+                "data": "yScale"
+              },
+              "encode": {
+                "update": {
+                  "align": {
+                    "value": "center"
+                  },
+                  "x": {
+                    "signal": "(startColumnWidth-columnPadding)/2"
+                  },
+                  "y": {
+                    "signal": "scale('y', datum.id)+bandwidth('y')/2"
+                  },
+                  "text": {
+                    "signal": "timeFormat(datum.labelEnd,' %Y/%m/%d')"
+                  },
+                  "font": {
+                    "signal": "datum.phase == datum.task?'Arial':'Segoe UI'"
+                  },
+                  "fontWeight": {
+                    "signal": "datum.phase == datum.task?'bold':'normal'"
+                  },
+                  "fill": {
+                    "signal": "datum.id == itemHovered.id  ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):textColour"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "name": "daysColumnWidth",
+          "clip": {
+            "signal": "!showColumns"
+          },
+          "title": {
+            "text": {
+              "signal": "'Days'"
+            },
+            "anchor": "end",
+            "dx": {
+              "signal": "-columnPadding"
+            },
+            "frame": "group",
+            "align": "right"
+          },
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "daysColumnWidth"
+              },
+              "stroke": {
+                "value": "transparent"
+              },
+              "height": {
+                "signal": "height"
+              }
+            }
+          },
+          "marks": [
+            {
+              "type": "text",
+              "style": "col",
+              "clip": true,
+              "from": {
+                "data": "yScale"
+              },
+              "encode": {
+                "update": {
+                  "align": {
+                    "value": "right"
+                  },
+                  "x": {
+                    "signal": "daysColumnWidth-columnPadding"
+                  },
+                  "y": {
+                    "signal": "scale('y', datum.id)+bandwidth('y')/2"
+                  },
+                  "text": {
+                    "signal": "format(datum.days,',')+' d'"
+                  },
+                  "fontWeight": {
+                    "signal": "datum.phase == datum.task?'bold':'normal'"
+                  },
+                  "font": {
+                    "signal": "datum.phase == datum.task?'Arial':'Segoe UI'"
+                  },
+                  "fill": {
+                    "signal": "datum.id == itemHovered.id  ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):textColour"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "name": "statusColumn",
+          "clip": {
+            "signal": "!showColumns"
+          },
+          "title": {
+            "text": {
+              "signal": "statusColumnPresent?'Status':''"
+            },
+            "anchor": "middle",
+            "frame": "group",
+            "align": "center"
+          },
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "statusColumnWidth"
+              },
+              "stroke": {
+                "value": "transparent"
+              },
+              "height": {
+                "signal": "height"
+              }
+            }
+          },
+          "marks": [
+            {
+              "type": "symbol",
+              "clip": true,
+              "from": {
+                "data": "yScale"
+              },
+              "encode": {
+                "update": {
+                  "x": {
+                    "signal": "statusColumnWidth/2"
+                  },
+                  "size": {
+                    "signal": "550"
+                  },
+                  "fill": {
+                    "signal": "datum.id == itemHovered.id && isValid(datum.status) && datum.status!='' ?merge(hsl(scale('statusBackground',datum.status)), {l:0.72}):scale('statusBackground',datum.status)"
+                  },
+                  "yc": {
+                    "signal": "(scale('y',datum.id)+bandwidth('y')/2)"
+                  }
+                }
+              }
+            },
+            {
+              "type": "text",
+              "clip": true,
+              "from": {
+                "data": "yScale"
+              },
+              "encode": {
+                "update": {
+                  "baseline": {
+                    "value": "middle"
+                  },
+                  "align": {
+                    "value": "center"
+                  },
+                  "x": {
+                    "signal": "statusColumnWidth/2"
+                  },
+                  "fill": {
+                    "signal": "datum.id == itemHovered.id && isValid(datum.status) && datum.status!='' ?merge(hsl(scale('statusFont',datum.status)), {l:0.20}):scale('statusFont',datum.status)"
+                  },
+                  "y": {
+                    "signal": "(scale('y',datum.id)+bandwidth('y')/2)+1"
+                  },
+                  "text": {
+                    "signal": "scale('statusText',datum.status)"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "name": "completionColumn",
+          "clip": {
+            "signal": "!showColumns"
+          },
+          "title": {
+            "text": {
+              "signal": "'Progress'"
+            },
+            "anchor": "start",
+            "frame": "group",
+            "align": "left"
+          },
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "progressColumnWidth"
+              },
+              "stroke": {
+                "value": "transparent"
+              },
+              "height": {
+                "signal": "height"
+              }
+            }
+          },
+          "marks": [
+            {
+              "type": "rect",
+              "clip": true,
+              "from": {
+                "data": "yScale"
+              },
+              "encode": {
+                "update": {
+                  "x": {
+                    "signal": "1"
+                  },
+                  "width": {
+                    "signal": "item.mark.group.width-2-columnPadding"
+                  },
+                  "stroke": {
+                    "signal": "'#a0d786'"
+                  },
+                  "yc": {
+                    "signal": "(scale('y',datum.id)+bandwidth('y')/2)"
+                  },
+                  "fill": {
+                    "value": "white"
+                  },
+                  "height": {
+                    "signal": "bandwidth('y')-yPaddingInner*2"
+                  },
+                  "strokeWidth": {
+                    "signal": "datum.id == itemHovered.id?2:1"
+                  }
+                }
+              }
+            },
+            {
+              "type": "rect",
+              "clip": true,
+              "from": {
+                "data": "yScale"
+              },
+              "encode": {
+                "update": {
+                  "x": {
+                    "signal": "1"
+                  },
+                  "width": {
+                    "signal": "((item.mark.group.width-columnPadding)/100)*datum.completion"
+                  },
+                  "fill": {
+                    "signal": "'#c6ecb5'"
+                  },
+                  "yc": {
+                    "signal": "(scale('y',datum.id)+bandwidth('y')/2)"
+                  },
+                  "strokeWidth": {
+                    "value": 1
+                  },
+                  "height": {
+                    "signal": "bandwidth('y')-yPaddingInner*2"
+                  }
+                }
+              }
+            },
+            {
+              "type": "text",
+              "clip": true,
+              "from": {
+                "data": "yScale"
+              },
+              "encode": {
+                "update": {
+                  "align": {
+                    "value": "left"
+                  },
+                  "dx": {
+                    "value": 3
+                  },
+                  "fill": {
+                    "signal": "textColour"
+                  },
+                  "y": {
+                    "signal": "scale('y',datum.id)+bandwidth('y')/2"
+                  },
+                  "text": {
+                    "signal": "datum.completion+'%'"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "weekendContainer",
+      "encode": {
+        "update": {
+          "x": {
+            "signal": "columnsWidth"
+          },
+          "y": {
+            "signal": "-15"
+          },
+          "clip": {
+            "signal": "true"
+          },
+          "height": {
+            "signal": "height+15"
+          },
+          "width": {
+            "signal": "ganttWidth"
+          },
+          "fill": {
+            "value": "transparent"
+          }
+        }
+      },
+      "marks": [
+        {
+          "type": "rect",
+          "description": "Weekend shading",
+          "name": "weekendShading",
+          "from": {
+            "data": "weekends"
+          },
+          "encode": {
+            "update": {
+              "x": {
+                "signal": "scale('x',datum.start)"
+              },
+              "x2": {
+                "signal": "scale('x',datum.end)"
+              },
+              "y": {
+                "signal": "dayBandwidthRound>=minDayBandwidth?0:15"
+              },
+              "y2": {
+                "signal": "scaledHeight<height?yRange[1]+15:height+15"
+              },
+              "strokeWidth": {
+                "signal": "1"
+              },
+              "stroke": {
+                "value": "#f1f1f1"
+              },
+              "fill": {
+                "value": "#f1f1f1"
+              }
+            }
+          }
+        },
+        {
+          "name": "todayHighlight",
+          "description": "Today highlight",
+          "type": "rect",
+          "data": [
+            {}
+          ],
+          "encode": {
+            "update": {
+              "x": {
+                "signal": "scale('x',today) "
+              },
+              "width": {
+                "signal": "dayBandwidth"
+              },
+              "y": {
+                "value": 0
+              },
+              "height": {
+                "signal": "15"
+              },
+              "fill": {
+                "value": "#a5c8e4"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "ganttContainer",
+      "encode": {
+        "update": {
+          "x": {
+            "signal": "columnsWidth"
+          },
+          "y": {
+            "signal": "0"
+          },
+          "clip": {
+            "signal": "true"
+          },
+          "height": {
+            "signal": "height"
+          },
+          "width": {
+            "signal": "ganttWidth"
+          },
+          "fill": {
+            "value": "transparent"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "completionLabelSizes",
+          "type": "text",
+          "from": {
+            "data": "tasks"
+          },
+          "encode": {
+            "enter": {
+              "fill": {
+                "value": "transparent"
+              },
+              "text": {
+                "signal": "datum.completionLabel"
+              }
+            }
+          }
+        },
+        {
+          "name": "taskLabels",
+          "description": "Task, milestone and phase names",
+          "from": {
+            "data": "yScale"
+          },
+          "type": "text",
+          "encode": {
+            "update": {
+              "x": {
+                "scale": "x",
+                "field": "end"
+              },
+              "align": {
+                "signal": "'left'"
+              },
+              "dx": {
+                "signal": "datum.milestone?sqrt(milestoneSymbolSize)/2 - dayBandwidth/2 + 5:5"
+              },
+              "y": {
+                "signal": "datum.phase == datum.task?scale('y', datum.id)-2:scale('y', datum.id)"
+              },
+              "dy": {
+                "signal": "bandwidth('y')/2"
+              },
+              "fill": {
+                "signal": "datum.id == itemHovered.id  ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):textColour"
+              },
+              "text": {
+                "signal": "datum.milestone?datum.task:datum.task && datum.assignee? datum.task + ' ('+ datum.days+' d'+')' +' - ' + datum.assignee:datum.task + ' ('+ datum.days+' d'+')'"
+              }
+            }
+          }
+        },
+        {
+          "type": "group",
+          "from": {
+            "facet": {
+              "name": "dependencyLinesFacet",
+              "data": "dependencyLines",
+              "groupby": [
+                "id",
+                "sourceId"
+              ]
+            }
+          },
+          "marks": [
+            {
+              "type": "line",
+              "from": {
+                "data": "dependencyLinesFacet"
+              },
+              "encode": {
+                "enter": {
+                  "x": {
+                    "signal": "datum.value[0]"
+                  },
+                  "y": {
+                    "signal": "datum.value[1]"
+                  },
+                  "stroke": {
+                    "value": "#888888"
+                  },
+                  "strokeWidth": {
+                    "value": 1
+                  },
+                  "interpolate": {
+                    "value": "linear"
+                  },
+                  "strokeJoin": {
+                    "value": "bevel"
+                  },
+                  "strokeCap": {
+                    "value": "round"
+                  },
+                  "defined": {
+                    "value": true
+                  }
+                },
+                "update": {
+                  "stroke": {
+                    "signal": "datum.id == itemHovered.id  ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):'#888888'"
+                  },
+                  "strokeWidth": {
+                    "signal": "datum.id == itemHovered.id?1.5:1"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "todayRule",
+          "description": "Today rule",
+          "type": "rule",
+          "data": [
+            {}
+          ],
+          "encode": {
+            "update": {
+              "x": {
+                "signal": "scale('x',today+oneDay/2) "
+              },
+              "y2": {
+                "signal": "scaledHeight<height?yRange[1]:height"
+              },
+              "strokeWidth": {
+                "value": 1
+              },
+              "stroke": {
+                "value": "#377eb9"
+              },
+              "strokeDash": {
+                "value": [
+                  2,
+                  2
+                ]
+              },
+              "opacity": {
+                "value": 0.8
+              }
+            }
+          }
+        },
+        {
+          "name": "todayText",
+          "description": "Today text",
+          "type": "text",
+          "data": [
+            {}
+          ],
+          "encode": {
+            "update": {
+              "x": {
+                "signal": "scale('x',today+oneDay/2)"
+              },
+              "fill": {
+                "value": "#377eb9"
+              },
+              "text": {
+                "value": "Today"
+              },
+              "angle": {
+                "signal": "90"
+              },
+              "baseline": {
+                "value": "bottom"
+              },
+              "dx": {
+                "value": 10
+              },
+              "dy": {
+                "value": -4
+              },
+              "opacity": {
+                "value": 0.7
+              }
+            }
+          }
+        },
+        {
+          "name": "taskBars",
+          "description": "The task bars (serve as an outline for percent complete)",
+          "type": "group",
+          "from": {
+            "data": "tasks"
+          },
+          "encode": {
+            "update": {
+              "clip": {
+                "signal": "true"
+              },
+              "x": {
+                "scale": "x",
+                "field": "start"
+              },
+              "x2": {
+                "scale": "x",
+                "field": "end"
+              },
+              "yc": {
+                "signal": "(scale('y',datum.id)+bandwidth('y')/2)"
+              },
+              "height": {
+                "signal": "bandwidth('y')-yPaddingInner*2"
+              },
+              "tooltip": {
+                "signal": "showTooltips&&down==null?{'Phase':datum.phase ,'Task':datum.task , 'Start':timeFormat(datum.start,'%a, %d %B %Y' ),'End':timeFormat(datum.labelEnd,'%a, %d %B %Y' ), 'Days':datum.days, 'Assignee':datum.assignee ,'Progress':datum.completionLabel }:null"
+              },
+              "fill": {
+                "signal": "(datum.completion <= 60 && today >= datum.labelEnd - 3*oneDay) ? '#ffc9c9' : (datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?merge(hsl(scale('cLight', datum.phase)), {l:0.65}):scale('cLight', datum.phase))"
+              },
+              "stroke": {
+                "signal": "(datum.completion <= 60 && today >= datum.labelEnd - 3*oneDay) ? '#e03131' : (datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):scale('cDark', datum.phase))"
+              },
+              "cornerRadius": {
+                "value": 5
+              },
+              "zindex": {
+                "value": 101
+              },
+              "strokeWidth": {
+                "signal": "(datum.completion <= 60 && today >= datum.labelEnd - 3*oneDay) ? 2 : (datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?1.5:1)"
+              },
+              "href": {
+                "field": "hyperlink"
+              }
+            }
+          },
+          "transform": [
+            {
+              "type": "lookup",
+              "from": "completionLabelSizes",
+              "key": "datum.id",
+              "fields": [
+                "datum.id"
+              ],
+              "values": [
+                "bounds.x1",
+                "bounds.x2"
+              ],
+              "as": [
+                "a",
+                "b"
+              ]
+            }
+          ],
+          "marks": [
+            {
+              "name": "taskFills",
+              "description": "Percent complete for each task",
+              "type": "rect",
+              "interactive": false,
+              "encode": {
+                "update": {
+                  "x": {
+                    "signal": "0"
+                  },
+                  "y": {
+                    "signal": "0"
+                  },
+                  "height": {
+                    "signal": "item.mark.group.height"
+                  },
+                  "width": {
+                    "signal": "(item.mark.group.width/100)* item.mark.group.datum.completion"
+                  },
+                  "fill": {
+                    "signal": "(item.mark.group.datum.completion <= 60 && today >= item.mark.group.datum.labelEnd - 3*oneDay) ? '#e03131' : (toString(item.mark.group.datum.id) == itemHovered.id  || indexof(itemHovered.dependencies,toString(item.mark.group.datum.id) )> -1 ?merge(hsl(scale('cDark', item.mark.group.datum.phase)), {l:0.40}):scale('cDark', item.mark.group.datum.phase))"
+                  },
+                  "strokeWidth": {
+                    "value": 0
+                  },
+                  "cornerRadiusBottomLeft": {
+                    "value": 5
+                  },
+                  "cornerRadiusTopLeft": {
+                    "value": 5
+                  }
+                }
+              }
+            },
+            {
+              "name": "completeText",
+              "description": "Completion Text",
+              "type": "text",
+              "interactive": false,
+              "encode": {
+                "update": {
+                  "x": {
+                    "signal": "(item.mark.group.width/100)* parent.completion"
+                  },
+                  "align": {
+                    "signal": "'right'"
+                  },
+                  "dx": {
+                    "signal": "-2"
+                  },
+                  "baseline": {
+                    "value": "middle"
+                  },
+                  "y": {
+                    "signal": "item.mark.group.height/2+1"
+                  },
+                  "text": {
+                    "signal": "round(((item.mark.group.width/100)* parent.completion))>=(item.mark.group.b+4) && parent.completion>0?parent.completionLabel:''"
+                  },
+                  "fill": {
+                    "signal": "luminance(item.mark.group.stroke) >=0.45?'black':'white'"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "projectOutline",
+          "description": "The project bar outlines",
+          "type": "path",
+          "from": {
+            "data": "projectPaths"
+          },
+          "encode": {
+            "update": {
+              "path": {
+                "signal": "datum.phasePath"
+              },
+              "fill": {
+                "signal": "datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?merge(hsl(scale('cLight', datum.phase)), {l:0.65}):scale('cLight', datum.phase)"
+              },
+              "stroke": {
+                "signal": "datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):scale('cDark', datum.phase)"
+              },
+              "strokeWidth": {
+                "signal": "datum.id == itemHovered.id?1.5:1"
+              },
+              "tooltip": {
+                "signal": "showTooltips&&down==null?{'Phase':datum.project , 'Start':timeFormat(datum.start,'%a, %d %B %Y' ),'End':timeFormat(datum.labelEnd,'%a, %d %B %Y' ), 'Days':datum.days,'Progress':datum.completion+'%' }:null"
+              },
+              "cursor": {
+                "value": "pointer"
+              }
+            }
+          }
+        },
+        {
+          "name": "categoryOutline",
+          "description": "The category bar outlines",
+          "type": "path",
+          "from": {
+            "data": "categoryPaths"
+          },
+          "encode": {
+            "update": {
+              "path": {
+                "signal": "datum.phasePath"
+              },
+              "fill": {
+                "signal": "datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?merge(hsl(scale('cLight', datum.phase)), {l:0.65}):scale('cLight', datum.phase)"
+              },
+              "stroke": {
+                "signal": "datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):scale('cDark', datum.phase)"
+              },
+              "strokeWidth": {
+                "signal": "datum.id == itemHovered.id?1.5:1"
+              },
+              "tooltip": {
+                "signal": "showTooltips&&down==null?{'Phase':datum.category , 'Start':timeFormat(datum.start,'%a, %d %B %Y' ),'End':timeFormat(datum.labelEnd,'%a, %d %B %Y' ), 'Days':datum.days,'Progress':datum.completion+'%' }:null"
+              },
+              "cursor": {
+                "value": "pointer"
+              }
+            }
+          }
+        },
+        {
+          "name": "typeOutline",
+          "description": "The type (機械/制御) bar outlines",
+          "type": "path",
+          "from": {
+            "data": "typePaths"
+          },
+          "encode": {
+            "update": {
+              "path": {
+                "signal": "datum.phasePath"
+              },
+              "fill": {
+                "signal": "datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?merge(hsl(scale('cLight', datum.phase)), {l:0.65}):scale('cLight', datum.phase)"
+              },
+              "stroke": {
+                "signal": "datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):scale('cDark', datum.phase)"
+              },
+              "strokeWidth": {
+                "signal": "datum.id == itemHovered.id?1.5:1"
+              },
+              "tooltip": {
+                "signal": "showTooltips&&down==null?{'区分':datum.type , 'Start':timeFormat(datum.start,'%a, %d %B %Y' ),'End':timeFormat(datum.labelEnd,'%a, %d %B %Y' ), 'Days':datum.days,'Progress':datum.completion+'%' }:null"
+              },
+              "cursor": {
+                "value": "pointer"
+              }
+            }
+          }
+        },
+        {
+          "name": "phaseOutline",
+          "description": "The phase bar outlines",
+          "type": "path",
+          "from": {
+            "data": "phasePaths"
+          },
+          "encode": {
+            "update": {
+              "path": {
+                "signal": "datum.phasePath"
+              },
+              "fill": {
+                "signal": "datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?merge(hsl(scale('cLight', datum.phase)), {l:0.65}):scale('cLight', datum.phase)"
+              },
+              "stroke": {
+                "signal": "datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):scale('cDark', datum.phase)"
+              },
+              "strokeWidth": {
+                "signal": "datum.id == itemHovered.id?1.5:1"
+              },
+              "tooltip": {
+                "signal": "showTooltips&&down==null?{'Phase':datum.phase , 'Start':timeFormat(datum.start,'%a, %d %B %Y' ),'End':timeFormat(datum.labelEnd,'%a, %d %B %Y' ), 'Days':datum.days,'Progress':datum.completion+'%' }:null"
+              },
+              "cursor": {
+                "value": "pointer"
+              }
+            }
+          }
+        },
+        {
+          "name": "phaseGroup",
+          "description": "Group to hold the x y coordinates for the SVG clipping fills",
+          "type": "group",
+          "clip": true,
+          "from": {
+            "data": "phasePaths"
+          },
+          "encode": {
+            "update": {
+              "strokeWidth": {
+                "value": 0
+              },
+              "stroke": {
+                "value": "red"
+              },
+              "x": {
+                "scale": "x",
+                "field": "start",
+                "offset": 0
+              },
+              "x2": {
+                "scale": "x",
+                "field": "end",
+                "offset": 0
+              },
+              "yc": {
+                "signal": "scale('y',datum.id)+bandwidth('y')/2"
+              },
+              "height": {
+                "signal": "bandwidth('y')-yPaddingInner*2"
+              }
+            }
+          },
+          "marks": [
+            {
+              "name": "phaseFills",
+              "description": "Percent complete for each phase. Clipping path signal has to be here as it fails to update on zoom when coming from a dataset. The only value available in the clipping path signal is parent!",
+              "type": "rect",
+              "interactive": false,
+              "clip": {
+                "path": {
+                  "signal": "'M 0 0'  + ' L ' +   (scale('x', parent.end) - scale('x', parent.start)) +' 0'    + ' v ' +  phaseSymbolHeight + ' L ' + (scale('x', parent.end) - scale('x', parent.start) - phaseSymbolWidth) +' '  +   (phaseSymbolHeight/2) + ' H ' +  phaseSymbolWidth + ' L 0 '   +   phaseSymbolHeight + ' z'"
+                }
+              },
+              "encode": {
+                "update": {
+                  "height": {
+                    "signal": "phaseSymbolHeight"
+                  },
+                  "width": {
+                    "signal": "(item.mark.group.width/100)* item.mark.group.datum.completion"
+                  },
+                  "fill": {
+                    "signal": "toString(item.mark.group.datum.id) == itemHovered.id  || indexof(itemHovered.dependencies,toString(item.mark.group.datum.id) )> -1 ?merge(hsl(scale('cDark', item.mark.group.datum.phase)), {l:0.40}):scale('cDark', item.mark.group.datum.phase)"
+                  },
+                  "strokeWidth": {
+                    "value": 0
+                  },
+                  "stroke": {
+                    "value": "red"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "projectGroup",
+          "description": "Project progress fills (clipped to project shape)",
+          "type": "group",
+          "clip": true,
+          "from": {
+            "data": "projectPaths"
+          },
+          "encode": {
+            "update": {
+              "strokeWidth": {
+                "value": 0
+              },
+              "x": {
+                "scale": "x",
+                "field": "start"
+              },
+              "x2": {
+                "scale": "x",
+                "field": "end"
+              },
+              "y": {
+                "signal": "scale('y', datum.id) + yPaddingInner"
+              },
+              "height": {
+                "signal": "phaseSymbolHeight"
+              }
+            }
+          },
+          "marks": [
+            {
+              "name": "projectFills",
+              "type": "rect",
+              "interactive": false,
+              "clip": {
+                "path": {
+                  "signal": "'M 0 0' + ' L ' + (scale('x', parent.end) - scale('x', parent.start)) + ' 0' + ' v ' + phaseSymbolHeight + ' L ' + (scale('x', parent.end) - scale('x', parent.start) - phaseSymbolWidth) + ' ' + (phaseSymbolHeight/2) + ' H ' + phaseSymbolWidth + ' L 0 ' + phaseSymbolHeight + ' z'"
+                }
+              },
+              "encode": {
+                "update": {
+                  "x": {
+                    "value": 0
+                  },
+                  "y": {
+                    "value": 0
+                  },
+                  "height": {
+                    "signal": "phaseSymbolHeight"
+                  },
+                  "width": {
+                    "signal": "(item.mark.group.width/100) * item.mark.group.datum.completion"
+                  },
+                  "fill": {
+                    "signal": "scale('cDark', item.mark.group.datum.phase)"
+                  },
+                  "strokeWidth": {
+                    "value": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "milestoneSymbols",
+          "description": "Milestones",
+          "type": "symbol",
+          "from": {
+            "data": "milestones"
+          },
+          "encode": {
+            "update": {
+              "x": {
+                "signal": "scale('x',datum.start)+dayBandwidth/2"
+              },
+              "y": {
+                "signal": "scale('y', datum.id)+bandwidth('y')/2"
+              },
+              "size": {
+                "signal": "milestoneSymbolSize"
+              },
+              "shape": {
+                "value": "diamond"
+              },
+              "fill": {
+                "signal": "(datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1)  && datum.completion > 0 ?merge(hsl(scale( 'cDark', datum.phase)), {l:0.40}):datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1   ?merge(hsl(scale( 'cLight', datum.phase)), {l:0.65}):datum.completion > 0?  scale('cDark', datum.phase):scale('cLight', datum.phase)"
+              },
+              "stroke": {
+                "signal": "datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1 ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):scale('cDark', datum.phase)"
+              },
+              "strokeWidth": {
+                "signal": "datum.id == itemHovered.id  || indexof(itemHovered.dependencies,datum.id )> -1  ?1.5:1"
+              },
+              "tooltip": {
+                "signal": "showTooltips&&down==null?{'Phase':datum.phase ,'Task':datum.task , 'Start':timeFormat(datum.start,'%a, %d %B %Y' ),'End':timeFormat(datum.labelEnd,'%a, %d %B %Y' ), 'Days':datum.days,'Assignee':datum.assignee ,'Progress':datum.completionLabel }:null"
+              }
+            }
+          }
+        },
+        {
+          "name": "taskDependencyArrowsymbol",
+          "description": "Dependency arrows",
+          "type": "symbol",
+          "from": {
+            "data": "dependencyArrows"
+          },
+          "encode": {
+            "update": {
+              "shape": {
+                "value": "triangle-right"
+              },
+              "x": {
+                "signal": "scale('x',datum.start)",
+                "offset": {
+                  "signal": "datum.milestone!=null && datum.milestone != false? -(sqrt(arrowSymbolSize))/2 + dayBandwidth/2 - (sqrt(milestoneSymbolSize))/2 +1:-(sqrt(arrowSymbolSize)/2) +1"
+                }
+              },
+              "y": {
+                "signal": "scale('y', datum.id)+bandwidth('y')/2"
+              },
+              "fill": {
+                "signal": "datum.id == itemHovered.id  ?merge(hsl(scale('cDark', datum.phase)), {l:0.40}):'#6a6a6a'"
+              },
+              "size": {
+                "signal": "arrowSymbolSize"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "taskSelector",
+      "description": "Hidden rect to support phase expand and collapse",
+      "type": "rect",
+      "clip": true,
+      "zindex": 99,
+      "from": {
+        "data": "yScale"
+      },
+      "encode": {
+        "update": {
+          "x": {
+            "value": -15
+          },
+          "x2": {
+            "signal": "columnsWidth"
+          },
+          "y": {
+            "signal": "scale('y', datum.id)"
+          },
+          "height": {
+            "signal": "bandwidth('y')"
+          },
+          "fill": {
+            "value": "transparent"
+          },
+          "cursor": {
+            "signal": "datum.phase == datum.task?'pointer':'auto'"
+          },
+          "href": {
+            "field": "hyperlink"
+          }
+        }
+      }
+    },
+    {
+      "type": "group",
+      "name": "axisClipper",
+      "clip": true,
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "columnsWidth"
+          },
+          "stroke": {
+            "value": "transparent"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "right",
+          "encode": {
+            "ticks": {
+              "update": {
+                "x2": {
+                  "signal": "-columnsWidth"
+                }
+              }
+            }
+          },
+          "tickColor": "#f1f1f1",
+          "labels": false,
+          "title": "",
+          "grid": false,
+          "ticks": true,
+          "bandPosition": {
+            "signal": "0"
+          }
+        }
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "description": "Bottom date axis",
+      "ticks": true,
+      "labelPadding": -12,
+      "scale": "x",
+      "position": {
+        "signal": "columnsWidth"
+      },
+      "orient": "top",
+      "tickSize": 15,
+      "grid": false,
+      "zindex": 1,
+      "labelOverlap": false,
+      "formatType": "time",
+      "tickCount": {
+        "signal": "dayBandwidthRound>=minYearBandwidth?'day':'month'"
+      },
+      "encode": {
+        "ticks": {
+          "update": {
+            "strokeWidth": [
+              {
+                "test": "dayBandwidthRound>=minDayBandwidth",
+                "value": 1
+              },
+              {
+                "test": "dayBandwidthRound>=minMonthBandwidth && dayBandwidthRound<minDayBandwidth && date(datum.value) == 1",
+                "value": 1
+              },
+              {
+                "test": "dayBandwidthRound>=minYearBandwidth && dayBandwidthRound<minMonthBandwidth && date(datum.value) == 1",
+                "value": 1
+              },
+              {
+                "test": "dayBandwidthRound<minYearBandwidth && dayofyear(datum.value) == 1",
+                "value": 1
+              },
+              {
+                "value": 0
+              }
+            ]
+          }
+        },
+        "labels": {
+          "update": {
+            "text": [
+              {
+                "test": "dayBandwidthRound>=minDayBandwidth",
+                "signal": "timeFormat(datum.value,'%d')"
+              },
+              {
+                "test": "dayBandwidthRound>=minMonthBandwidth && dayBandwidthRound<minDayBandwidth && date(datum.value) == 15",
+                "signal": "timeFormat(datum.value,'%B %y')"
+              },
+              {
+                "test": "dayBandwidthRound>=minYearBandwidth && dayBandwidthRound<minMonthBandwidth && date(datum.value) == 15",
+                "signal": "timeFormat(datum.value,'%b')"
+              },
+              {
+                "test": "dayBandwidthRound<minYearBandwidth && month(datum.value) == 6",
+                "signal": "timeFormat(datum.value,'%Y')"
+              },
+              {
+                "value": ""
+              }
+            ],
+            "dx": {
+              "signal": "dayBandwidthRound/2"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Top date axis",
+      "scale": "x",
+      "position": {
+        "signal": "columnsWidth"
+      },
+      "domain": false,
+      "orient": "top",
+      "offset": 0,
+      "tickSize": 22,
+      "labelBaseline": "middle",
+      "grid": false,
+      "zindex": 0,
+      "tickCount": {
+        "signal": "dayBandwidthRound>=minYearBandwidth?'day':'month'"
+      },
+      "encode": {
+        "ticks": {
+          "update": {
+            "strokeWidth": [
+              {
+                "test": "dayBandwidthRound>=minDayBandwidth && date(datum.value) == 1",
+                "value": 1
+              },
+              {
+                "test": "dayBandwidthRound>=minYearBandwidth && dayBandwidthRound<minDayBandwidth && dayofyear(datum.value) == 1",
+                "value": 1
+              },
+              {
+                "value": 0
+              }
+            ]
+          }
+        },
+        "labels": {
+          "update": {
+            "text": [
+              {
+                "test": "dayBandwidthRound>=minDayBandwidth && date(datum.value) == 15",
+                "signal": "timeFormat(datum.value,'%B %y')"
+              },
+              {
+                "test": "dayBandwidthRound>=minYearBandwidth && dayBandwidthRound<minMonthBandwidth && month(datum.value) == 5 && date(datum.value) == 15",
+                "signal": "timeFormat(datum.value,'%Y')"
+              },
+              {
+                "value": ""
+              }
+            ],
+            "dx": {
+              "signal": "dayBandwidthRound/2"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Month grid lines",
+      "scale": "x",
+      "position": {
+        "signal": "columnsWidth"
+      },
+      "domain": false,
+      "orient": "top",
+      "labels": false,
+      "grid": true,
+      "tickSize": 0,
+      "zindex": 0,
+      "tickCount": {
+        "signal": " dayBandwidthRound>=minMonthBandwidth || dayBandwidthRound<=0.35?0:'month'"
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "time",
+      "domain": {
+        "signal": "xDom"
+      },
+      "range": {
+        "signal": "[0,ganttWidth]"
+      }
+    },
+    {
+      "name": "y",
+      "type": "band",
+      "domain": {
+        "fields": [
+          {
+            "data": "yScale",
+            "field": "id"
+          }
+        ],
+        "sort": {
+          "op": "min",
+          "field": "finalSort",
+          "order": "ascending"
+        }
+      },
+      "range": {
+        "signal": "yRange"
+      }
+    },
+    {
+      "name": "cDark",
+      "type": "ordinal",
+      "range": {
+        "signal": "colours.dark"
+      },
+      "domain": {
+        "fields": [
+          {
+            "data": "input",
+            "field": "phase"
+          },
+          {
+            "data": "input",
+            "field": "project"
+          },
+          {
+            "data": "input",
+            "field": "category"
+          },
+          {
+            "data": "input",
+            "field": "type"
+          }
+        ]
+      }
+    },
+    {
+      "name": "cLight",
+      "type": "ordinal",
+      "range": {
+        "signal": "colours.light"
+      },
+      "domain": {
+        "fields": [
+          {
+            "data": "input",
+            "field": "phase"
+          },
+          {
+            "data": "input",
+            "field": "project"
+          },
+          {
+            "data": "input",
+            "field": "category"
+          },
+          {
+            "data": "input",
+            "field": "type"
+          }
+        ]
+      }
+    },
+    {
+      "name": "statusText",
+      "type": "ordinal",
+      "range": {
+        "signal": "statusColumn.range"
+      },
+      "domain": {
+        "signal": "statusColumn.domain"
+      }
+    },
+    {
+      "name": "statusFont",
+      "type": "ordinal",
+      "range": {
+        "signal": "statusColumn.font"
+      },
+      "domain": {
+        "signal": "statusColumn.domain"
+      }
+    },
+    {
+      "name": "statusBackground",
+      "type": "ordinal",
+      "range": {
+        "signal": "statusColumn.background"
+      },
+      "domain": {
+        "signal": "statusColumn.domain"
+      }
+    }
+  ],
+  "config": {
+    "view": {
+      "stroke": "transparent"
+    },
+    "style": {
+      "col": {
+        "fontSize": 11
+      },
+      "cell": {
+        "strokeWidth": {
+          "value": "0"
+        }
+      }
+    },
+    "font": "Segoe UI",
+    "text": {
+      "font": "Segoe UI",
+      "fontSize": 10,
+      "baseline": "middle"
+    },
+    "axis": {
+      "labelColor": {
+        "signal": "textColour"
+      },
+      "labelFontSize": 10
+    },
+    "title": {
+      "color": {
+        "signal": "textColour"
+      }
+    }
+  }
+};
+
+  // ─── サンプルデータ（Excelと同じ構造） ───────────────────────────────
+  const SAMPLE_DATA = [
+    { id: 40, category: "開発機", project: "C", type: "機械", phase: "DR0", task: "ニーズ調査",    milestone: null, start: "2026-06-01", end: "2026-07-01", assignee: "thomas anderson", completion: 20, dependencies: "",   status: "very high", manhours: 40 },
+    { id: 41, category: "開発機", project: "C", type: "機械", phase: "DR1", task: "task1",         milestone: null, start: "2026-07-01", end: "2026-08-01", assignee: "thomas anderson", completion: 0,  dependencies: "40",  status: "very low",  manhours: 16 },
+    { id: 42, category: "開発機", project: "C", type: "機械", phase: "DR2", task: "task2",         milestone: null, start: "2026-08-01", end: "2026-09-01", assignee: "thomas anderson", completion: 65, dependencies: "41",  status: "low",       manhours: 24 },
+    { id: 43, category: "開発機", project: "C", type: "制御", phase: "DR3", task: "task3",         milestone: null, start: "2026-09-01", end: "2026-10-01", assignee: "山田",             completion: 50, dependencies: "42",  status: "midium",    manhours: 32 },
+    { id: 38, category: "開発機", project: "C", type: "制御", phase: "発注",  task: "発注",          milestone: null, start: "2026-10-01", end: "2026-11-01", assignee: "山田",             completion: 0,  dependencies: "43",  status: "high",      manhours: 8  },
+    { id: 44, category: "開発機", project: "C", type: "制御", phase: "発注",  task: "発注",          milestone: true, start: "2026-11-01", end: "2026-11-01", assignee: "山田",             completion: 0,  dependencies: "38",  status: "high",      manhours: 0  },
+    { id: 45, category: "開発機", project: "C", type: "制御", phase: "DR4",  task: "集計作業",      milestone: null, start: "2026-11-01", end: "2026-12-01", assignee: "山田",             completion: 0,  dependencies: "44",  status: "very high", manhours: 20 }
+  ];
+
+  // ─── CSV行をデータ形式に変換 ──────────────────────────────────────────
+  function parseRow(row) {
+    const milestone = row.milestone;
+    return {
+      id:           parseInt(row.id)            || 0,
+      category:     (row.category && String(row.category).trim()) || "(未分類)",
+      project:      row.project                 || "",
+      type:         (row.type && String(row.type).trim())         || "(未分類)",
+      phase:        row.phase                   || "",
+      task:         row.task                    || "",
+      milestone:    milestone === "true" || milestone === "1" || milestone === "TRUE" ? true : null,
+      start:        row.start                   || "",
+      end:          row.end                     || "",
+      assignee:     row.assignee                || "",
+      completion:   parseInt(row.completion)    || 0,
+      dependencies: row.dependencies != null ? String(row.dependencies).replace(/\.0$/, "") : "",
+      status:       row.status                  || "",
+      manhours:     parseFloat(row.manhours)    || 0
+    };
+  }
+
+  // ─── Vegaスペックのパッチ適用 ─────────────────────────────────────────
+  function patchSpec(spec, data) {
+    // pbiContainerHeight / pbiContainerWidth をカスタムシグナルに置換
+    let specStr = JSON.stringify(spec);
+    specStr = specStr.replace(/pbiContainerHeight/g, "containerHeight");
+    specStr = specStr.replace(/pbiContainerWidth/g,  "containerWidth");
+    spec = JSON.parse(specStr);
+
+    // containerHeight / containerWidth シグナルを先頭に追加
+    spec.signals.unshift(
+      { name: "containerHeight", value: window.innerHeight - 46 },
+      { name: "containerWidth",  value: window.innerWidth       }
+    );
+
+    // データを dataset に注入
+    const dsIndex = spec.data.findIndex(d => d.name === "dataset");
+    if (dsIndex !== -1) {
+      spec.data[dsIndex].values = data;
+    }
+
+    return spec;
+  }
+
+  // ─── タブ切り替え ────────────────────────────────────────────────────
+  let currentTab = 'gantt';
+  function showTab(tab) {
+    currentTab = tab;
+    // TASK SUMMARY タブにサマリーカードと負荷グラフをまとめて表示
+    document.getElementById('vis').style.display     = tab === 'gantt'   ? 'block' : 'none';
+    document.getElementById('summary').style.display = tab === 'summary' ? 'block' : 'none';
+    document.getElementById('load').style.display    = tab === 'summary' ? 'block' : 'none';
+    document.getElementById('help').style.display    = tab === 'help'    ? 'block' : 'none';
+    // 絞り込みバーは ガント／サマリー のときだけ表示
+    document.getElementById('filterBar').style.display = (tab === 'help') ? 'none' : 'flex';
+    document.getElementById('tabGantt').classList.toggle('active',   tab === 'gantt');
+    document.getElementById('tabSummary').classList.toggle('active', tab === 'summary');
+    document.getElementById('tabHelp').classList.toggle('active',    tab === 'help');
+    if (tab === 'help') renderHelp();
+    if (tab === 'summary' && lastData) { renderSummary(lastData); renderLoad(lastData); }
+  }
+
+  // ─── カラーパレット ───────────────────────────────────────────────────
+  const LOAD_COLORS = [
+    '#0078d4','#107c10','#d83b01','#8764b8','#038387',
+    '#c239b3','#986f0b','#00b294','#e81123','#4f6bed'
+  ];
+
+  // ─── 月別担当者負荷グラフ用: 各バーの下に担当者名を表示するプラグイン ───
+  const assigneeAxisLabelPlugin = {
+    id: 'assigneeAxisLabel',
+    afterDraw(chart) {
+      const { ctx, scales } = chart;
+      const xScale = scales.x;
+      ctx.save();
+      ctx.font = '9px sans-serif';
+      ctx.fillStyle = '#888';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      chart.data.datasets.forEach((dataset, dsIndex) => {
+        const meta = chart.getDatasetMeta(dsIndex);
+        if (meta.hidden) return;
+        meta.data.forEach((bar, i) => {
+          if (!dataset.data[i]) return;   // 値0のバーは表示しない
+          const label = dataset.label.length > 4 ? dataset.label.slice(0, 4) + '…' : dataset.label;
+          ctx.fillText(label, bar.x, xScale.bottom + 3);
+        });
+      });
+      ctx.restore();
+    }
+  };
+
+  // 開始日〜終了日（両端含む）の稼働日数。土日（0=日,6=土）を除く
+  function workingDays(start, end) {
+    let count = 0;
+    const cur  = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const last = new Date(end.getFullYear(),   end.getMonth(),   end.getDate());
+    while (cur <= last) {
+      const dow = cur.getDay();
+      if (dow !== 0 && dow !== 6) count++;
+      cur.setDate(cur.getDate() + 1);
+    }
+    return count;
+  }
+
+  // ─── 負荷グラフ描画 ───────────────────────────────────────────────────
+  let loadChartInstance = null;
+  let loadChartProjInstance = null;
+
+  function renderLoad(data) {
+    const tasks = data.filter(d => d.milestone !== true && (parseInt(d.completion) || 0) < 100 && (d.assignee || '') !== '参考');
+    if (tasks.length === 0) {
+      document.getElementById('load').innerHTML =
+        `<p style="color:#888;font-size:13px;padding:28px 32px;">
+          <i class="bi bi-check-circle" style="color:#43a047;margin-right:6px;"></i>未完了タスクがありません。
+        </p>`;
+      return;
+    }
+
+    // ─── プロジェクト別 工数（人時）を集計 ─────────────────────────────
+    // 各タスクの (開始〜終了の日数) × 標準工数8H を、プロジェクト単位で合計
+    const STD_HOURS = 8;
+    const WORKLOAD_ALERT_RATE = 100;  // 稼働率(%)がこれを超えたら赤で警告
+    const projectHours = {};
+    const projectAssignees = {};   // プロジェクトごとのアサイン担当者(重複なし)
+    const projectSpan = {};        // プロジェクトごとの最早開始日・最遅終了日
+    data.forEach(d => {
+      if (d.milestone === true) return;                 // マイルストーンは除外
+      if ((d.assignee || '') === '参考') return;        // 参考行は除外
+      const p = d.project || '(未設定)';
+      if (d.assignee) {
+        if (!projectAssignees[p]) projectAssignees[p] = new Set();
+        projectAssignees[p].add(d.assignee);
+      }
+      const s = new Date(d.start), e = new Date(d.end);
+      const datesValid = !isNaN(s) && !isNaN(e);
+      // 工数(manhours)があればそれを使用。無ければ期間×8Hにフォールバック
+      const mh = parseFloat(d.manhours) || 0;
+      let hours = 0;
+      if (mh > 0) {
+        hours = mh;
+      } else if (datesValid) {
+        hours = workingDays(s, e) * STD_HOURS;          // フォールバック: 土日を除く稼働日数×8H
+      }
+      if (hours > 0) projectHours[p] = (projectHours[p] || 0) + hours;
+      // プロジェクト期間（稼働率の分母用）は日付が有効な行だけで算出
+      if (datesValid) {
+        if (!projectSpan[p]) projectSpan[p] = { start: s, end: e };
+        if (s < projectSpan[p].start) projectSpan[p].start = s;
+        if (e > projectSpan[p].end)   projectSpan[p].end   = e;
+      }
+    });
+    const projEntries  = Object.entries(projectHours).sort((a, b) => b[1] - a[1]);
+    const projLabels   = projEntries.map(e => e[0]);
+    const projHoursArr = projEntries.map(e => e[1]);
+    // 1人あたり工数 = プロジェクト工数 ÷ アサイン人数（未アサインは1人として計算）
+    const projPerPersonArr = projEntries.map(([p, hours]) => {
+      const n = projectAssignees[p] ? projectAssignees[p].size : 0;
+      return Math.round(hours / (n || 1));
+    });
+    const projAssigneeCountArr = projEntries.map(([p]) => projectAssignees[p] ? projectAssignees[p].size : 0);
+    // 稼働率(%) = 1人あたり必要工数 ÷ (プロジェクト期間の稼働日数 × 8H) × 100
+    const projWorkloadRateArr = projEntries.map(([p], i) => {
+      const span = projectSpan[p];
+      const capacityDays  = span ? workingDays(span.start, span.end) : 0;
+      const capacityHours = capacityDays * STD_HOURS;
+      return capacityHours > 0 ? Math.round((projPerPersonArr[i] / capacityHours) * 100) : 0;
+    });
+
+    // 日付範囲を取得
+    const allStarts = tasks.map(d => new Date(d.start)).filter(d => !isNaN(d));
+    const allEnds   = tasks.map(d => new Date(d.end)).filter(d => !isNaN(d));
+    const minDate = new Date(Math.min(...allStarts));
+    const maxDate = new Date(Math.max(...allEnds));
+
+    // 月リストを生成
+    const months = [];
+    const cur = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+    while (cur <= maxDate) {
+      months.push(new Date(cur));
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    const monthLabels = months.map(m =>
+      `${m.getFullYear()}/${String(m.getMonth()+1).padStart(2,'0')}`
+    );
+
+    // 担当者リスト
+    const assignees = [...new Set(tasks.map(d => d.assignee || '(未設定)'))].sort();
+
+    // 月×担当者のスコアを計算
+    const scoreMatrix = {};
+    assignees.forEach(a => { scoreMatrix[a] = Array(months.length).fill(0); });
+
+    tasks.forEach(t => {
+      const name      = t.assignee || '(未設定)';
+      const taskStart = new Date(t.start);
+      const taskEnd   = new Date(t.end);
+      const score     = getScore(t.status);
+      months.forEach((m, i) => {
+        const mEnd = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+        if (taskStart <= mEnd && taskEnd >= m) {
+          scoreMatrix[name][i] += score;
+        }
+      });
+    });
+
+    // ─── 最大値からセル色分けの閾値を計算（月別スコアマトリクスと同じロジック）───
+    const allScores   = Object.values(scoreMatrix).flat().filter(v => v > 0);
+    const maxScore    = allScores.length ? Math.max(...allScores) : 1;
+    const highThresh  = maxScore * 0.7;
+    const midThresh   = maxScore * 0.35;
+    const scoreColor  = v => v >= highThresh ? '#e03131' : v >= midThresh ? '#f57f17' : '#43a047';
+
+    // ─── Chart.js データセット（棒の色 = 高/中/低の相対評価）───────────
+    const datasets = assignees.map(name => ({
+      label: name,
+      data:  scoreMatrix[name],
+      backgroundColor: scoreMatrix[name].map(v => scoreColor(v) + 'cc'),
+      borderColor:     scoreMatrix[name].map(v => scoreColor(v)),
+      borderWidth: 1,
+      borderRadius: 4,
+    }));
+
+    document.getElementById('load').innerHTML = `
+      <div class="load-header">
+        <h2><i class="bi bi-bar-chart-fill" style="color:#0078d4;margin-right:8px;"></i>負荷グラフ</h2>
+        <span class="subtitle">月別の担当者負荷と、プロジェクト別の必要工数</span>
+      </div>
+      <div class="load-note">
+        <i class="bi bi-info-circle-fill"></i>
+        スコアが高いほど負荷が大きいことを示します。担当者間のバランスをご確認ください。
+      </div>
+
+      <div class="load-table-title" style="margin-top:4px;">
+        <i class="bi bi-people-fill"></i> 月別 担当者負荷（未完了タスク × 難易度スコア）
+        <span style="font-size:11px;color:#888;font-weight:normal;margin-left:8px;">
+          棒の色 =
+          <span style="background:#fce4ec;color:#c62828;padding:1px 6px;border-radius:3px;">高</span>
+          <span style="background:#fff8e1;color:#f57f17;padding:1px 6px;border-radius:3px;margin-left:4px;">中</span>
+          <span style="background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:3px;margin-left:4px;">低</span>
+          （各セルは最大スコアに対する相対評価。担当者名・値はホバーで表示）
+        </span>
+      </div>
+      <div class="load-chart-wrap">
+        <canvas id="loadChart" height="90"></canvas>
+      </div>
+
+      <div class="load-table-title" style="margin-top:28px;">
+        <i class="bi bi-kanban-fill"></i> プロジェクト別 必要工数（人時）
+        <span style="font-size:11px;color:#888;font-weight:normal;margin-left:8px;">
+          各タスクの工数(<code>manhours</code>)の合計（未入力の行は期間×8Hで補完）／1人あたり = 必要工数 ÷ アサイン人数
+          ／<span style="background:#fce4ec;color:#c62828;padding:1px 6px;border-radius:3px;">赤：プロジェクト期間の稼働率${WORKLOAD_ALERT_RATE}%以上（詰まっている）</span>
+        </span>
+      </div>
+      <div class="load-chart-wrap">
+        <canvas id="loadChartProj" height="110"></canvas>
+      </div>
+    `;
+
+    // 既存チャートを破棄して再描画
+    if (loadChartInstance) loadChartInstance.destroy();
+    loadChartInstance = new Chart(
+      document.getElementById('loadChart'),
+      {
+        type: 'bar',
+        data: { labels: monthLabels, datasets },
+        plugins: [assigneeAxisLabelPlugin],
+        options: {
+          responsive: true,
+          layout: { padding: { bottom: 16 } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` ${ctx.dataset.label}：${ctx.parsed.y}pt`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { font: { size: 12 } }
+            },
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'スコア (pt)', font: { size: 11 }, color: '#888' },
+              ticks: { font: { size: 11 } },
+              grid:  { color: '#f0f0f0' }
+            }
+          }
+        }
+      }
+    );
+
+    // ─── プロジェクト別 必要工数（人時）チャート ───────────────────────
+    if (loadChartProjInstance) loadChartProjInstance.destroy();
+    loadChartProjInstance = new Chart(
+      document.getElementById('loadChartProj'),
+      {
+        type: 'bar',
+        data: {
+          labels: projLabels,
+          datasets: [
+            {
+              label: '必要工数（合計）',
+              data: projHoursArr,
+              backgroundColor: LOAD_COLORS[0] + 'cc',
+              borderColor:     LOAD_COLORS[0],
+              borderWidth: 1,
+              borderRadius: 4,
+            },
+            {
+              label: '1人あたり必要工数',
+              data: projPerPersonArr,
+              backgroundColor: projWorkloadRateArr.map(r => r >= WORKLOAD_ALERT_RATE ? '#e03131cc' : LOAD_COLORS[1] + 'cc'),
+              borderColor:     projWorkloadRateArr.map(r => r >= WORKLOAD_ALERT_RATE ? '#e03131'   : LOAD_COLORS[1]),
+              borderWidth: 1,
+              borderRadius: 4,
+            }
+          ]
+        },
+        options: {
+          indexAxis: 'y',          // 横棒グラフ（プロジェクト数が多くても見やすい）
+          responsive: true,
+          plugins: {
+            legend: { display: true, position: 'top', labels: { font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const days = Math.round(ctx.parsed.x / 8);
+                  if (ctx.datasetIndex === 1) {
+                    const n = projAssigneeCountArr[ctx.dataIndex];
+                    const rate = projWorkloadRateArr[ctx.dataIndex];
+                    const warn = rate >= WORKLOAD_ALERT_RATE ? '⚠️ 高稼働率' : '';
+                    return ` ${ctx.dataset.label}：${ctx.parsed.x} 人時（約${days}人日）　アサイン${n}人　稼働率${rate}% ${warn}`;
+                  }
+                  return ` ${ctx.dataset.label}：${ctx.parsed.x} 人時（約${days}人日）`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              title: { display: true, text: '工数 (人時 / H)', font: { size: 11 }, color: '#888' },
+              ticks: { font: { size: 11 } },
+              grid:  { color: '#f0f0f0' }
+            },
+            y: {
+              grid: { display: false },
+              ticks: { font: { size: 12 } }
+            }
+          }
+        }
+      }
+    );
+  }
+
+  // ─── 使い方ページ描画 ─────────────────────────────────────────────────
+  function renderHelp() {
+    document.getElementById('help').innerHTML = `
+      <div class="help-page-title">
+        <i class="bi bi-question-circle-fill"></i>
+        <h2>使い方ガイド</h2>
+      </div>
+
+      <div class="help-grid">
+
+        <!-- ① CSVの読み込み方 -->
+        <div class="help-card">
+          <div class="help-card-header">
+            <i class="bi bi-upload"></i> CSVの読み込み方
+          </div>
+          <div class="help-card-body">
+            <div class="help-step">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <div class="step-title">SharePointからCSVをダウンロード</div>
+                <div class="step-desc">SharePointのファイル一覧で <strong>プロジェクト管理表.csv</strong> を右クリック → 「ダウンロード」</div>
+              </div>
+            </div>
+            <div class="help-step">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <div class="step-title">「CSVを読み込む」ボタンをクリック</div>
+                <div class="step-desc">画面上部のボタンをクリックして、ダウンロードしたCSVファイルを選択します。</div>
+              </div>
+            </div>
+            <div class="help-step">
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <div class="step-title">ガントチャートが更新される</div>
+                <div class="step-desc">最新のデータでチャートが表示されます。</div>
+              </div>
+            </div>
+            <div class="help-tip">
+              <i class="bi bi-lightbulb-fill"></i>
+              <span>文字化けする場合は、ExcelでCSVを保存し直す際に <strong>「CSV UTF-8（コンマ区切り）」</strong> を選んでください。</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ② ガントチャートの見方 -->
+        <div class="help-card">
+          <div class="help-card-header">
+            <i class="bi bi-bar-chart-gantt"></i> ガントチャートの見方
+          </div>
+          <div class="help-card-body">
+            <div class="help-step">
+              <div class="step-num"><i class="bi bi-arrows-move" style="font-size:11px;"></i></div>
+              <div class="step-body">
+                <div class="step-title">ドラッグで左右に移動</div>
+                <div class="step-desc">チャート上をドラッグすると時間軸を移動できます。</div>
+              </div>
+            </div>
+            <div class="help-step">
+              <div class="step-num"><i class="bi bi-zoom-in" style="font-size:11px;"></i></div>
+              <div class="step-body">
+                <div class="step-title">スクロールでズーム</div>
+                <div class="step-desc">マウスホイールでチャートを拡大・縮小できます。</div>
+              </div>
+            </div>
+            <div class="help-step">
+              <div class="step-num"><i class="bi bi-layout-three-columns" style="font-size:11px;"></i></div>
+              <div class="step-body">
+                <div class="step-title">右上のボタンで表示切替</div>
+                <div class="step-desc"><code>Days</code> <code>Months</code> で日・月単位の表示に切り替えられます。ダブルクリックで全体表示に戻ります。</div>
+              </div>
+            </div>
+            <div class="help-step">
+              <div class="step-num"><i class="bi bi-palette" style="font-size:11px;"></i></div>
+              <div class="step-body">
+                <div class="step-title">優先度の色</div>
+                <div class="step-desc">
+                  <span class="status-badge" style="background:#d9f2e0;color:#2e7d32;">VL Very Low</span>
+                  <span class="status-badge" style="background:#c6efce;color:#388e3c;">L Low</span>
+                  <span class="status-badge" style="background:#ffeb9c;color:#f57f17;">M Medium</span>
+                  <span class="status-badge" style="background:#f8cbad;color:#e65100;">H High</span>
+                  <span class="status-badge" style="background:#ffbfc1;color:#c62828;">VH Very High</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ③ Excelの列の説明 -->
+        <div class="help-card">
+          <div class="help-card-header">
+            <i class="bi bi-table"></i> Excelの列の説明
+          </div>
+          <div class="help-card-body">
+            <table class="help-table">
+              <thead>
+                <tr><th>列名</th><th>内容</th><th></th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>id</code></td><td>行ごとの番号（重複不可）</td><td><span class="req">必須</span></td></tr>
+                <tr><td><code>category</code></td><td>大分類（例：<code>開発機</code> / <code>量産機</code>）。プロジェクトの上の階層としてグループ化される</td><td><span class="opt">任意（未入力は「(未分類)」扱い）</span></td></tr>
+                <tr><td><code>project</code></td><td>プロジェクト名</td><td><span class="req">必須</span></td></tr>
+                <tr><td><code>type</code></td><td>機械／制御の区分（例：<code>機械</code> / <code>制御</code>）。プロジェクトとフェーズの間の階層としてグループ化される</td><td><span class="opt">任意（未入力は「(未分類)」扱い）</span></td></tr>
+                <tr><td><code>phase</code></td><td>フェーズ名（DR0・DR1など）</td><td><span class="req">必須</span></td></tr>
+                <tr><td><code>task</code></td><td>タスク名</td><td><span class="req">必須</span></td></tr>
+                <tr><td><code>start</code></td><td>開始日（例：2026/06/01）</td><td><span class="req">必須</span></td></tr>
+                <tr><td><code>end</code></td><td>終了日（例：2026/07/01）</td><td><span class="req">必須</span></td></tr>
+                <tr><td><code>completion</code></td><td>進捗率（0〜100）</td><td><span class="req">必須</span></td></tr>
+                <tr><td><code>status</code></td><td>難易度。<b>次の5つの英語表記のみ</b>使用：<code>very low</code> / <code>low</code> / <code>medium</code> / <code>high</code> / <code>very high</code>（<code>hard</code>・<code>easy</code>・日本語などは認識されません）</td><td><span class="req">必須</span></td></tr>
+                <tr><td><code>assignee</code></td><td>担当者名</td><td><span class="opt">任意</span></td></tr>
+                <tr><td><code>manhours</code></td><td>そのタスクの見積工数（時間）。負荷グラフの「必要工数」に使われる。<b>未入力の場合は「期間×8H」で自動計算</b>（実態とズレやすいので、なるべく入力推奨）</td><td><span class="opt">任意</span></td></tr>
+                <tr><td><code>dependencies</code></td><td>依存タスクのid</td><td><span class="opt">任意</span></td></tr>
+                <tr><td><code>milestone</code></td><td>マイルストーンにする場合は <code>TRUE</code></td><td><span class="opt">任意</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ④ よくある質問 -->
+        <div class="help-card">
+          <div class="help-card-header">
+            <i class="bi bi-chat-square-quote-fill"></i> よくある質問
+          </div>
+          <div class="help-card-body">
+            <div class="faq-item">
+              <div class="faq-q"><i class="bi bi-question-circle-fill"></i>文字化けして表示される</div>
+              <div class="faq-a"><i class="bi bi-check-circle-fill"></i>ExcelでCSVを保存する際、「CSV UTF-8（コンマ区切り）」を選んでください。「CSV（コンマ区切り）」とは別のメニューです。</div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-q"><i class="bi bi-question-circle-fill"></i>CSVを読み込んでも表示が変わらない</div>
+              <div class="faq-a"><i class="bi bi-check-circle-fill"></i>ファイルを選択後、少し待ってみてください。データ量が多いと時間がかかる場合があります。</div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-q"><i class="bi bi-question-circle-fill"></i>チャートの表示が崩れる・一部のタスクが出ない</div>
+              <div class="faq-a"><i class="bi bi-check-circle-fill"></i><b>いちばん多い原因は <code>start</code>（開始日）の空欄です。</b>納期(<code>end</code>)だけ入れた行（【組立図】系のタスクなど）は開始日が抜けやすく、開始日が空だとそのバーが描けず表示が崩れます。<b>毎回の更新前に、全タスクの <code>start</code> と <code>end</code> が埋まっているか必ず確認</b>してください。</div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-q"><i class="bi bi-question-circle-fill"></i>更新前のチェックリスト（表示崩れを防ぐ）</div>
+              <div class="faq-a"><i class="bi bi-check-circle-fill"></i>
+                ① <code>start</code>・<code>end</code> が<b>全行</b>埋まっている（空欄なし）／
+                ② 日付は <code>2026/7/17</code> の形式で統一（<code>2026-08-18</code> のハイフン形式を混ぜない）／
+                ③ <code>status</code> は <code>very low / low / medium / high / very high</code> の5表記のみ（<code>hard</code>・<code>easy</code>・日本語はNG）／
+                ④ <code>id</code> が重複していない
+              </div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-q"><i class="bi bi-question-circle-fill"></i>特定のタスクだけ見たい（絞り込み）</div>
+              <div class="faq-a"><i class="bi bi-check-circle-fill"></i>画面上部の <b>絞り込みバー</b>を使います。<b>タスク名で検索</b>／<b>難易度</b>（VL〜VH、複数選択可）／<b>期間</b>（開始〜終了の2つの日付で、その期間に重なるタスクだけ表示）で絞れます。<b>ガントとタスクサマリーの両方</b>に反映されます。「クリア」で解除。</div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-q"><i class="bi bi-question-circle-fill"></i>チャートが見切れている</div>
+              <div class="faq-a"><i class="bi bi-check-circle-fill"></i>チャート右上の「All」ボタンを押すと全体が表示されます。ダブルクリックでもリセットできます。</div>
+            </div>
+            <div class="faq-item">
+              <div class="faq-q"><i class="bi bi-question-circle-fill"></i>スマホで見られますか</div>
+              <div class="faq-a"><i class="bi bi-check-circle-fill"></i>PCブラウザでの利用を推奨しています。スマホでも開けますが、ガントチャートの操作がしにくい場合があります。</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    `;
+  }
+
+  // ─── 難易度スコア ────────────────────────────────────────────────────
+  const STATUS_SCORE = {
+    'very low': 1, 'low': 2, 'medium': 3, 'midium': 3, 'high': 4, 'very high': 5
+  };
+
+  function getScore(status) {
+    return STATUS_SCORE[(status || '').toLowerCase().trim()] || 1;
+  }
+
+  // ─── 作業量サマリー描画 ──────────────────────────────────────────────
+  const CHIP_CLASS = {
+    'very low':1, 'low':2, 'medium':3, 'midium':3, 'high':4, 'very high':5
+  };
+  const CHIP_LABEL = ['','VL','L','M','H','VH'];
+  const CHIP_CSS   = ['','chip-vl','chip-l','chip-m','chip-h','chip-vh'];
+  const CHIP_NAME  = ['','Very Low','Low','Medium','High','Very High'];
+
+  function renderSummary(data) {
+    const incomplete = data.filter(d => d.milestone !== true && (parseInt(d.completion) || 0) < 100 && d.assignee !== '参考');
+
+    // 遅延判定用：今日(0時) と 3日(ms)。ガントの赤ハイライトと同条件
+    const now = new Date();
+    const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const THREE_DAYS = 3 * 86400000;
+
+    const map = {};
+    incomplete.forEach(d => {
+      const name = d.assignee || '(未設定)';
+      if (!map[name]) map[name] = { count: 0, score: 0, tasks: [] };
+      const s = getScore(d.status);
+      const comp = parseInt(d.completion) || 0;
+      const end = new Date(d.end);
+      // 進捗60%以下 かつ 終了日の3日前を過ぎている → 遅延
+      const atRisk = !isNaN(end) && comp <= 60 && todayMid >= (end.getTime() - THREE_DAYS);
+      map[name].count++;
+      map[name].score += s;
+      map[name].tasks.push({
+        task: d.task || '',
+        project: d.project || '',
+        phase: d.phase || '',
+        completion: comp,
+        score: s,
+        rank: CHIP_CLASS[(d.status||'').toLowerCase().trim()] || 3,
+        atRisk
+      });
+    });
+
+    const entries = Object.entries(map).sort((a, b) => b[1].score - a[1].score);
+    const maxScore = entries.length ? entries[0][1].score : 1;
+
+    let html = `
+      <div class="summary-header">
+        <h2><i class="bi bi-people-fill" style="color:#0078d4;margin-right:8px;"></i>作業量サマリー</h2>
+        <span class="subtitle">未完了タスク × 難易度スコア</span>
+      </div>
+`;
+
+    if (entries.length === 0) {
+      html += `<p style="color:#888;font-size:13px;"><i class="bi bi-check-circle" style="margin-right:6px;color:#43a047;"></i>未完了タスクがありません。</p>`;
+    } else {
+      html += `<div class="summary-cards">`;
+      entries.forEach(([name, v]) => {
+        const pct = Math.round((v.score / maxScore) * 100);
+        const initial = name.charAt(0).toUpperCase();
+
+        // 未完了タスク一覧（難易度の高い順）
+        const taskItems = v.tasks
+          .slice()
+          .sort((a, b) => b.score - a.score)
+          .map(t => `
+            <div class="task-item${t.atRisk ? ' task-item-risk' : ''}">
+              <span class="chip ${CHIP_CSS[t.rank]}">${CHIP_LABEL[t.rank]}</span>
+              <span class="ti-name" title="${t.project} / ${t.phase} / ${t.task}${t.atRisk ? '（遅延）' : ''}">
+                ${t.atRisk ? '<i class="bi bi-exclamation-triangle-fill" style="color:#e03131;margin-right:4px;"></i>' : ''}${t.task}<span class="ti-phase"> — ${t.phase}</span>
+              </span>
+              <span class="ti-prog">${t.completion}%</span>
+            </div>`).join('');
+
+        html += `
+          <div class="assignee-card">
+            <div class="card-header">
+              <div class="avatar">${initial}</div>
+              <span class="card-name">${name}</span>
+              <span class="card-score-badge"><i class="bi bi-lightning-fill"></i> ${v.score}pt</span>
+            </div>
+            <div class="card-body">
+              <div class="card-stat">
+                <i class="bi bi-list-check"></i>
+                未完了タスク <strong>${v.count}件</strong>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${pct}%"></div>
+              </div>
+              <div class="task-list-title">
+                <i class="bi bi-card-checklist"></i> タスク項目一覧
+              </div>
+              <div class="task-list">${taskItems}</div>
+            </div>
+          </div>`;
+      });
+      html += `</div>`;
+    }
+
+    document.getElementById('summary').innerHTML = html;
+  }
+
+  // ─── チャート描画 ─────────────────────────────────────────────────────
+  let vegaView  = null;
+  let lastData  = null;   // 現在チャートに表示しているデータ（絞り込み後）
+  let fullData  = null;   // 読み込んだ全データ（絞り込みの元）
+
+  // ─── ガントチャート描画（Vega） ──────────────────────────────────────
+  function renderGantt(data) {
+    document.getElementById("loading").style.display = "block";
+    document.getElementById("vis").innerHTML = "";
+    const spec = JSON.parse(JSON.stringify(GANTT_SPEC)); // deep copy
+    const patched = patchSpec(spec, data);
+    document.getElementById("loading").style.display = "none";
+    vegaEmbed("#vis", patched, { actions: false, renderer: "svg" })
+      .then(result => {
+        vegaView = result.view;
+        window.addEventListener("resize", () => {
+          if (!vegaView) return;
+          vegaView
+            .signal("containerHeight", window.innerHeight - 46)
+            .signal("containerWidth",  window.innerWidth)
+            .run();
+        });
+      });
+  }
+
+  // ─── データ読み込み（全データをセットして絞り込みを初期化） ────────────
+  function loadData(data) {
+    fullData = data;
+    resetFilters();
+    applyFilters();
+  }
+
+  // ─── 絞り込み条件を適用して再描画 ────────────────────────────────────
+  function filterData(data) {
+    const kw    = (document.getElementById('fTask').value || '').toLowerCase().trim();
+    const ranks = [...document.querySelectorAll('#fStatus button.active')].map(b => +b.dataset.rank);
+    const fromV = document.getElementById('fStart').value;
+    const toV   = document.getElementById('fEnd').value;
+    const from  = fromV ? new Date(fromV) : null;
+    const to    = toV   ? new Date(toV)   : null;
+    return data.filter(d => {
+      if (kw && !((d.task || '').toLowerCase().includes(kw))) return false;
+      if (ranks.length && !ranks.includes(getScore(d.status))) return false;
+      if (from || to) {
+        const s = new Date(d.start), e = new Date(d.end);
+        if (isNaN(s) || isNaN(e)) return false;      // 日付が無い行は期間絞り込み時は除外
+        if (from && e < from) return false;          // タスクが期間より前に終わる
+        if (to   && s > to)   return false;          // タスクが期間より後に始まる
+      }
+      return true;
+    });
+  }
+
+  function applyFilters() {
+    if (!fullData) return;
+    const filtered = filterData(fullData);
+    lastData = filtered;
+    const cnt = document.getElementById('fCount');
+    cnt.innerHTML = '<b>' + filtered.length + '</b> / ' + fullData.length + ' 件';
+
+    if (filtered.length === 0) {
+      document.getElementById('vis').innerHTML =
+        '<p style="padding:48px 32px;color:#888;font-size:14px;"><i class="bi bi-search" style="margin-right:8px;"></i>該当するタスクがありません。絞り込み条件を変えてください。</p>';
+      document.getElementById('summary').innerHTML = '';
+      document.getElementById('load').innerHTML = '';
+      return;
+    }
+    renderGantt(filtered);
+    renderSummary(filtered);
+    if (currentTab === 'summary') renderLoad(filtered);
+  }
+
+  function resetFilters() {
+    document.getElementById('fTask').value = '';
+    document.getElementById('fStart').value = '';
+    document.getElementById('fEnd').value = '';
+    document.querySelectorAll('#fStatus button.active').forEach(b => b.classList.remove('active'));
+  }
+
+  // ─── 絞り込みバーのイベント ──────────────────────────────────────────
+  let filterTimer = null;
+  function debouncedApply() {
+    clearTimeout(filterTimer);
+    filterTimer = setTimeout(applyFilters, 220);
+  }
+  document.getElementById('fTask').addEventListener('input', debouncedApply);
+  document.getElementById('fStart').addEventListener('change', applyFilters);
+  document.getElementById('fEnd').addEventListener('change', applyFilters);
+  document.querySelectorAll('#fStatus button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      applyFilters();
+    });
+  });
+  document.getElementById('fClear').addEventListener('click', () => {
+    resetFilters();
+    applyFilters();
+  });
+
+  // ─── CSV読み込みイベント ──────────────────────────────────────────────
+  document.getElementById("csvFile").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    document.getElementById("fileName").textContent = file.name;
+
+    // Shift-JIS / UTF-8 自動判定
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const bytes = new Uint8Array(ev.target.result);
+      // BOM確認 (UTF-8 BOM: EF BB BF)
+      const isUtf8Bom = bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF;
+      const encoding = isUtf8Bom ? "UTF-8" : "Shift-JIS";
+      Papa.parse(file, {
+        header:         true,
+        skipEmptyLines: true,
+        encoding:       encoding,
+        complete: (result) => {
+          const data = result.data.map(parseRow);
+          showTab('gantt');
+          loadData(data);
+        }
+      });
+    };
+    reader.readAsArrayBuffer(file.slice(0, 3));
+  });
+
+  // ─── 初期表示（サンプルデータ） ──────────────────────────────────────
+  loadData(SAMPLE_DATA);
+</script>
+
+</body>
+</html>
