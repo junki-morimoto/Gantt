@@ -63,13 +63,17 @@
     }
     #filterBar .fb-label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #0078d4; }
     #filterBar input[type="text"],
-    #filterBar input[type="date"] {
+    #filterBar input[type="date"],
+    #filterBar select {
       font-family: inherit; font-size: 12.5px; color: #1a1a2e;
       border: 1px solid #cdd6e5; border-radius: 6px; padding: 5px 9px; background: #fff;
+      max-width: 160px;
     }
-    #filterBar input[type="text"] { width: 200px; }
+    #filterBar input[type="text"] { width: 150px; }
+    #filterBar select { cursor: pointer; }
     #filterBar input[type="text"]:focus,
-    #filterBar input[type="date"]:focus { outline: none; border-color: #0078d4; box-shadow: 0 0 0 2px rgba(0,120,212,0.15); }
+    #filterBar input[type="date"]:focus,
+    #filterBar select:focus { outline: none; border-color: #0078d4; box-shadow: 0 0 0 2px rgba(0,120,212,0.15); }
     #filterBar .fb-group { display: inline-flex; align-items: center; gap: 6px; }
     #filterBar .fb-status { display: inline-flex; gap: 4px; }
     #filterBar .fb-status button {
@@ -655,7 +659,11 @@
 
 <div id="filterBar">
   <span class="fb-label"><i class="bi bi-funnel-fill"></i> 絞り込み</span>
-  <input type="text" id="fTask" placeholder="タスク名で検索…" autocomplete="off">
+  <span class="fb-group">category <select id="fCategory"><option value="">すべて</option></select></span>
+  <span class="fb-group">project <select id="fProject"><option value="">すべて</option></select></span>
+  <span class="fb-group">type <select id="fType"><option value="">すべて</option></select></span>
+  <span class="fb-group">phase <select id="fPhase"><option value="">すべて</option></select></span>
+  <span class="fb-group">task <input type="text" id="fTask" list="taskList" placeholder="選択 or 入力…" autocomplete="off"><datalist id="taskList"></datalist></span>
   <span class="fb-group">
     難易度
     <span class="fb-status" id="fStatus">
@@ -4977,7 +4985,7 @@
             </div>
             <div class="faq-item">
               <div class="faq-q"><i class="bi bi-question-circle-fill"></i>特定のタスクだけ見たい（絞り込み）</div>
-              <div class="faq-a"><i class="bi bi-check-circle-fill"></i>画面上部の <b>絞り込みバー</b>を使います。<b>タスク名で検索</b>／<b>難易度</b>（VL〜VH、複数選択可）／<b>期間</b>（開始〜終了の2つの日付で、その期間に重なるタスクだけ表示）で絞れます。<b>ガントとタスクサマリーの両方</b>に反映されます。「クリア」で解除。</div>
+              <div class="faq-a"><i class="bi bi-check-circle-fill"></i>画面上部の <b>絞り込みバー</b>を使います。<b>category / project / type / phase</b> はプルダウンから選べます（CSVに入っている値が自動で候補に並びます）。<b>task</b> は入力欄で検索（候補からも選べます）。ほかに <b>難易度</b>（VL〜VH、複数選択可）と <b>期間</b>（開始〜終了に重なるタスク）でも絞れ、条件は組み合わせ可能です。<b>ガントとタスクサマリーの両方</b>に反映されます。「クリア」で解除。</div>
             </div>
             <div class="faq-item">
               <div class="faq-q"><i class="bi bi-question-circle-fill"></i>チャートが見切れている</div>
@@ -5106,14 +5114,24 @@
   let fullData  = null;   // 読み込んだ全データ（絞り込みの元）
 
   // ─── ガントチャート描画（Vega） ──────────────────────────────────────
+  const EMPTY_MSG_HTML = '<p style="padding:48px 32px;color:#888;font-size:14px;"><i class="bi bi-search" style="margin-right:8px;"></i>該当するタスクがありません。絞り込み条件を変えてください。</p>';
+  let renderId = 0;   // 非同期描画の世代管理（古い描画が新しい表示を上書きしないように）
   function renderGantt(data) {
+    const my = ++renderId;
     document.getElementById("loading").style.display = "block";
     document.getElementById("vis").innerHTML = "";
     const spec = JSON.parse(JSON.stringify(GANTT_SPEC)); // deep copy
     const patched = patchSpec(spec, data);
-    document.getElementById("loading").style.display = "none";
     vegaEmbed("#vis", patched, { actions: false, renderer: "svg" })
       .then(result => {
+        document.getElementById("loading").style.display = "none";
+        if (my !== renderId) {
+          // 古い描画: 現在の絞り込みが0件なら空メッセージを再表示（SVGの上書きを打ち消す）。再描画はしない（連鎖防止）
+          if (fullData && filterData(fullData).length === 0) {
+            document.getElementById('vis').innerHTML = EMPTY_MSG_HTML;
+          }
+          return;
+        }
         vegaView = result.view;
         window.addEventListener("resize", () => {
           if (!vegaView) return;
@@ -5128,12 +5146,32 @@
   // ─── データ読み込み（全データをセットして絞り込みを初期化） ────────────
   function loadData(data) {
     fullData = data;
+    populateFilterOptions(data);
     resetFilters();
     applyFilters();
   }
 
+  // 各ドロップダウンをCSVの実データ値で埋める（重複なし・出現順を保ちつつソート）
+  function populateFilterOptions(data) {
+    const fields = { fCategory: 'category', fProject: 'project', fType: 'type', fPhase: 'phase' };
+    Object.entries(fields).forEach(([selId, key]) => {
+      const sel = document.getElementById(selId);
+      const cur = sel.value;
+      const vals = [...new Set(data.map(d => (d[key] || '').toString().trim()).filter(v => v))].sort((a, b) => a.localeCompare(b, 'ja'));
+      sel.innerHTML = '<option value="">すべて</option>' + vals.map(v => `<option value="${v.replace(/"/g,'&quot;')}">${v}</option>`).join('');
+      if (vals.includes(cur)) sel.value = cur;   // 既存の選択を維持
+    });
+    // task の候補（datalist）
+    const taskVals = [...new Set(data.map(d => (d.task || '').toString().trim()).filter(v => v))].sort((a, b) => a.localeCompare(b, 'ja'));
+    document.getElementById('taskList').innerHTML = taskVals.map(v => `<option value="${v.replace(/"/g,'&quot;')}"></option>`).join('');
+  }
+
   // ─── 絞り込み条件を適用して再描画 ────────────────────────────────────
   function filterData(data) {
+    const cat   = document.getElementById('fCategory').value;
+    const prj   = document.getElementById('fProject').value;
+    const typ   = document.getElementById('fType').value;
+    const phs   = document.getElementById('fPhase').value;
     const kw    = (document.getElementById('fTask').value || '').toLowerCase().trim();
     const ranks = [...document.querySelectorAll('#fStatus button.active')].map(b => +b.dataset.rank);
     const fromV = document.getElementById('fStart').value;
@@ -5141,6 +5179,10 @@
     const from  = fromV ? new Date(fromV) : null;
     const to    = toV   ? new Date(toV)   : null;
     return data.filter(d => {
+      if (cat && (d.category || '') !== cat) return false;
+      if (prj && (d.project  || '') !== prj) return false;
+      if (typ && (d.type     || '') !== typ) return false;
+      if (phs && (d.phase    || '') !== phs) return false;
       if (kw && !((d.task || '').toLowerCase().includes(kw))) return false;
       if (ranks.length && !ranks.includes(getScore(d.status))) return false;
       if (from || to) {
@@ -5161,8 +5203,8 @@
     cnt.innerHTML = '<b>' + filtered.length + '</b> / ' + fullData.length + ' 件';
 
     if (filtered.length === 0) {
-      document.getElementById('vis').innerHTML =
-        '<p style="padding:48px 32px;color:#888;font-size:14px;"><i class="bi bi-search" style="margin-right:8px;"></i>該当するタスクがありません。絞り込み条件を変えてください。</p>';
+      renderId++;   // 進行中の描画を無効化（0件メッセージが上書きされないように）
+      document.getElementById('vis').innerHTML = EMPTY_MSG_HTML;
       document.getElementById('summary').innerHTML = '';
       document.getElementById('load').innerHTML = '';
       return;
@@ -5173,6 +5215,7 @@
   }
 
   function resetFilters() {
+    ['fCategory','fProject','fType','fPhase'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('fTask').value = '';
     document.getElementById('fStart').value = '';
     document.getElementById('fEnd').value = '';
@@ -5186,6 +5229,8 @@
     filterTimer = setTimeout(applyFilters, 220);
   }
   document.getElementById('fTask').addEventListener('input', debouncedApply);
+  ['fCategory','fProject','fType','fPhase'].forEach(id =>
+    document.getElementById(id).addEventListener('change', applyFilters));
   document.getElementById('fStart').addEventListener('change', applyFilters);
   document.getElementById('fEnd').addEventListener('change', applyFilters);
   document.querySelectorAll('#fStatus button').forEach(btn => {
