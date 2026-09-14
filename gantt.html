@@ -92,6 +92,36 @@
     #filterBar .fb-count { margin-left: auto; color: #7b8194; font-weight: 600; white-space: nowrap; }
     #filterBar .fb-count b { color: #0078d4; }
 
+    /* 複数選択ドロップダウン */
+    #filterBar .ms { position: relative; }
+    #filterBar .ms-btn {
+      font-family: inherit; font-size: 12.5px; color: #1a1a2e; cursor: pointer;
+      border: 1px solid #cdd6e5; border-radius: 6px; padding: 5px 8px 5px 10px; background: #fff;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    #filterBar .ms-btn:hover { border-color: #0078d4; }
+    #filterBar .ms.open .ms-btn { border-color: #0078d4; box-shadow: 0 0 0 2px rgba(0,120,212,0.15); }
+    #filterBar .ms-btn i { font-size: 10px; color: #9aa3b5; }
+    #filterBar .ms-badge:empty { display: none; }
+    #filterBar .ms-badge {
+      background: #0078d4; color: #fff; font-size: 10.5px; font-weight: 700;
+      min-width: 16px; height: 16px; padding: 0 5px; border-radius: 999px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    #filterBar .ms-pop {
+      position: absolute; top: calc(100% + 4px); left: 0; z-index: 50;
+      background: #fff; border: 1px solid #cdd6e5; border-radius: 8px;
+      box-shadow: 0 6px 24px rgba(20,30,60,.16); padding: 6px; min-width: 170px; max-width: 300px;
+    }
+    #filterBar .ms-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; }
+    #filterBar .ms-list label {
+      display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px;
+      font-size: 12.5px; color: #1a1a2e; cursor: pointer; white-space: nowrap;
+    }
+    #filterBar .ms-list label:hover { background: #f0f5fb; }
+    #filterBar .ms-list input { margin: 0; cursor: pointer; flex-shrink: 0; }
+    #filterBar .ms-empty { color: #9aa3b5; font-size: 12px; padding: 6px 8px; }
+
     /* ─── タブボタン ─── */
     .tab-btn {
       display: inline-flex;
@@ -659,10 +689,10 @@
 
 <div id="filterBar">
   <span class="fb-label"><i class="bi bi-funnel-fill"></i> 絞り込み</span>
-  <span class="fb-group">category <select id="fCategory"><option value="">すべて</option></select></span>
-  <span class="fb-group">project <select id="fProject"><option value="">すべて</option></select></span>
-  <span class="fb-group">type <select id="fType"><option value="">すべて</option></select></span>
-  <span class="fb-group">phase <select id="fPhase"><option value="">すべて</option></select></span>
+  <div class="ms" data-field="category"><button type="button" class="ms-btn">category<span class="ms-badge"></span><i class="bi bi-chevron-down"></i></button><div class="ms-pop" hidden><div class="ms-list"></div></div></div>
+  <div class="ms" data-field="project"><button type="button" class="ms-btn">project<span class="ms-badge"></span><i class="bi bi-chevron-down"></i></button><div class="ms-pop" hidden><div class="ms-list"></div></div></div>
+  <div class="ms" data-field="type"><button type="button" class="ms-btn">type<span class="ms-badge"></span><i class="bi bi-chevron-down"></i></button><div class="ms-pop" hidden><div class="ms-list"></div></div></div>
+  <div class="ms" data-field="phase"><button type="button" class="ms-btn">phase<span class="ms-badge"></span><i class="bi bi-chevron-down"></i></button><div class="ms-pop" hidden><div class="ms-list"></div></div></div>
   <span class="fb-group">task <input type="text" id="fTask" list="taskList" placeholder="選択 or 入力…" autocomplete="off"><datalist id="taskList"></datalist></span>
   <span class="fb-group">
     難易度
@@ -4985,7 +5015,7 @@
             </div>
             <div class="faq-item">
               <div class="faq-q"><i class="bi bi-question-circle-fill"></i>特定のタスクだけ見たい（絞り込み）</div>
-              <div class="faq-a"><i class="bi bi-check-circle-fill"></i>画面上部の <b>絞り込みバー</b>を使います。<b>category / project / type / phase</b> はプルダウンから選べます（CSVに入っている値が自動で候補に並びます）。<b>task</b> は入力欄で検索（候補からも選べます）。ほかに <b>難易度</b>（VL〜VH、複数選択可）と <b>期間</b>（開始〜終了に重なるタスク）でも絞れ、条件は組み合わせ可能です。<b>ガントとタスクサマリーの両方</b>に反映されます。「クリア」で解除。</div>
+              <div class="faq-a"><i class="bi bi-check-circle-fill"></i>画面上部の <b>絞り込みバー</b>を使います。<b>category / project / type / phase</b> はボタンを押すと候補（CSVの値）が出て、<b>チェックで複数選択</b>できます（同じ項目内で複数選ぶとその<b>どれか</b>に一致、項目をまたぐと<b>両方</b>に一致で絞られます）。選択数はボタンの数字バッジで分かります。<b>task</b> は入力欄で検索（候補からも選択可）。ほかに <b>難易度</b>（VL〜VH 複数可）と <b>期間</b>（開始〜終了に重なるタスク）。<b>ガントとタスクサマリーの両方</b>に反映され、「クリア」で全解除。</div>
             </div>
             <div class="faq-item">
               <div class="faq-q"><i class="bi bi-question-circle-fill"></i>チャートが見切れている</div>
@@ -5151,27 +5181,40 @@
     applyFilters();
   }
 
-  // 各ドロップダウンをCSVの実データ値で埋める（重複なし・出現順を保ちつつソート）
+  const MS_FIELDS = ['category', 'project', 'type', 'phase'];
+  const esc = v => v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  // 各ドロップダウンをCSVの実データ値でチェックボックス生成（重複なし・五十音順）
   function populateFilterOptions(data) {
-    const fields = { fCategory: 'category', fProject: 'project', fType: 'type', fPhase: 'phase' };
-    Object.entries(fields).forEach(([selId, key]) => {
-      const sel = document.getElementById(selId);
-      const cur = sel.value;
-      const vals = [...new Set(data.map(d => (d[key] || '').toString().trim()).filter(v => v))].sort((a, b) => a.localeCompare(b, 'ja'));
-      sel.innerHTML = '<option value="">すべて</option>' + vals.map(v => `<option value="${v.replace(/"/g,'&quot;')}">${v}</option>`).join('');
-      if (vals.includes(cur)) sel.value = cur;   // 既存の選択を維持
+    MS_FIELDS.forEach(field => {
+      const ms   = document.querySelector(`.ms[data-field="${field}"]`);
+      const list = ms.querySelector('.ms-list');
+      const prev = new Set(getSelected(field));   // 既存の選択を保持
+      const vals = [...new Set(data.map(d => (d[field] || '').toString().trim()).filter(v => v))].sort((a, b) => a.localeCompare(b, 'ja'));
+      list.innerHTML = vals.length
+        ? vals.map(v => `<label><input type="checkbox" value="${esc(v)}"${prev.has(v) ? ' checked' : ''}>${esc(v)}</label>`).join('')
+        : '<div class="ms-empty">値がありません</div>';
+      updateBadge(field);
     });
     // task の候補（datalist）
     const taskVals = [...new Set(data.map(d => (d.task || '').toString().trim()).filter(v => v))].sort((a, b) => a.localeCompare(b, 'ja'));
-    document.getElementById('taskList').innerHTML = taskVals.map(v => `<option value="${v.replace(/"/g,'&quot;')}"></option>`).join('');
+    document.getElementById('taskList').innerHTML = taskVals.map(v => `<option value="${esc(v)}"></option>`).join('');
+  }
+
+  function getSelected(field) {
+    return [...document.querySelectorAll(`.ms[data-field="${field}"] .ms-list input:checked`)].map(i => i.value);
+  }
+  function updateBadge(field) {
+    const n = getSelected(field).length;
+    document.querySelector(`.ms[data-field="${field}"] .ms-badge`).textContent = n ? n : '';
   }
 
   // ─── 絞り込み条件を適用して再描画 ────────────────────────────────────
   function filterData(data) {
-    const cat   = document.getElementById('fCategory').value;
-    const prj   = document.getElementById('fProject').value;
-    const typ   = document.getElementById('fType').value;
-    const phs   = document.getElementById('fPhase').value;
+    const cat   = new Set(getSelected('category'));
+    const prj   = new Set(getSelected('project'));
+    const typ   = new Set(getSelected('type'));
+    const phs   = new Set(getSelected('phase'));
     const kw    = (document.getElementById('fTask').value || '').toLowerCase().trim();
     const ranks = [...document.querySelectorAll('#fStatus button.active')].map(b => +b.dataset.rank);
     const fromV = document.getElementById('fStart').value;
@@ -5179,10 +5222,10 @@
     const from  = fromV ? new Date(fromV) : null;
     const to    = toV   ? new Date(toV)   : null;
     return data.filter(d => {
-      if (cat && (d.category || '') !== cat) return false;
-      if (prj && (d.project  || '') !== prj) return false;
-      if (typ && (d.type     || '') !== typ) return false;
-      if (phs && (d.phase    || '') !== phs) return false;
+      if (cat.size && !cat.has(d.category || '')) return false;
+      if (prj.size && !prj.has(d.project  || '')) return false;
+      if (typ.size && !typ.has(d.type     || '')) return false;
+      if (phs.size && !phs.has(d.phase    || '')) return false;
       if (kw && !((d.task || '').toLowerCase().includes(kw))) return false;
       if (ranks.length && !ranks.includes(getScore(d.status))) return false;
       if (from || to) {
@@ -5215,7 +5258,11 @@
   }
 
   function resetFilters() {
-    ['fCategory','fProject','fType','fPhase'].forEach(id => document.getElementById(id).value = '');
+    MS_FIELDS.forEach(field => {
+      document.querySelectorAll(`.ms[data-field="${field}"] .ms-list input:checked`).forEach(i => i.checked = false);
+      updateBadge(field);
+    });
+    document.querySelectorAll('.ms.open').forEach(ms => { ms.classList.remove('open'); ms.querySelector('.ms-pop').hidden = true; });
     document.getElementById('fTask').value = '';
     document.getElementById('fStart').value = '';
     document.getElementById('fEnd').value = '';
@@ -5229,8 +5276,27 @@
     filterTimer = setTimeout(applyFilters, 220);
   }
   document.getElementById('fTask').addEventListener('input', debouncedApply);
-  ['fCategory','fProject','fType','fPhase'].forEach(id =>
-    document.getElementById(id).addEventListener('change', applyFilters));
+  // 複数選択ドロップダウン: ボタンで開閉、チェックで絞り込み
+  document.querySelectorAll('.ms').forEach(ms => {
+    const pop = ms.querySelector('.ms-pop');
+    ms.querySelector('.ms-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const willOpen = pop.hidden;
+      // 他を閉じる
+      document.querySelectorAll('.ms.open').forEach(o => { o.classList.remove('open'); o.querySelector('.ms-pop').hidden = true; });
+      ms.classList.toggle('open', willOpen);
+      pop.hidden = !willOpen;
+    });
+    ms.querySelector('.ms-list').addEventListener('change', () => {
+      updateBadge(ms.dataset.field);
+      applyFilters();
+    });
+    pop.addEventListener('click', (e) => e.stopPropagation());
+  });
+  // 外側クリックでパネルを閉じる
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.ms.open').forEach(o => { o.classList.remove('open'); o.querySelector('.ms-pop').hidden = true; });
+  });
   document.getElementById('fStart').addEventListener('change', applyFilters);
   document.getElementById('fEnd').addEventListener('change', applyFilters);
   document.querySelectorAll('#fStatus button').forEach(btn => {
