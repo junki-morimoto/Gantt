@@ -4123,6 +4123,70 @@
               }
             }
           }
+        },
+        {
+          "name": "filterDimLeft",
+          "description": "期間フィルター範囲外(前)を暗くするオーバーレイ",
+          "type": "rect",
+          "zindex": 200,
+          "interactive": false,
+          "data": [
+            {}
+          ],
+          "encode": {
+            "update": {
+              "x": {
+                "value": 0
+              },
+              "x2": {
+                "signal": "filterStartMs==null?0:max(0, min(ganttWidth, scale('x', filterStartMs)))"
+              },
+              "y": {
+                "value": 0
+              },
+              "y2": {
+                "signal": "scaledHeight<height?yRange[1]:height"
+              },
+              "fill": {
+                "value": "#1e2a38"
+              },
+              "opacity": {
+                "signal": "filterStartMs==null?0:0.16"
+              }
+            }
+          }
+        },
+        {
+          "name": "filterDimRight",
+          "description": "期間フィルター範囲外(後)を暗くするオーバーレイ",
+          "type": "rect",
+          "zindex": 200,
+          "interactive": false,
+          "data": [
+            {}
+          ],
+          "encode": {
+            "update": {
+              "x": {
+                "signal": "filterEndMs==null?ganttWidth:max(0, min(ganttWidth, scale('x', filterEndMs+oneDay)))"
+              },
+              "x2": {
+                "signal": "ganttWidth"
+              },
+              "y": {
+                "value": 0
+              },
+              "y2": {
+                "signal": "scaledHeight<height?yRange[1]:height"
+              },
+              "fill": {
+                "value": "#1e2a38"
+              },
+              "opacity": {
+                "signal": "filterEndMs==null?0:0.16"
+              }
+            }
+          }
         }
       ]
     },
@@ -4544,6 +4608,15 @@
     spec.signals.unshift(
       { name: "containerHeight", value: window.innerHeight - 46 },
       { name: "containerWidth",  value: window.innerWidth       }
+    );
+
+    // 期間フィルターの範囲外を暗くするための signal 注入（未指定なら null）
+    const parseLocalMs = v => { if (!v) return null; const p = v.split('-').map(Number); return +new Date(p[0], p[1] - 1, p[2]); };
+    const fStartEl = document.getElementById('fStart');
+    const fEndEl   = document.getElementById('fEnd');
+    spec.signals.unshift(
+      { name: "filterStartMs", value: fStartEl ? parseLocalMs(fStartEl.value) : null },
+      { name: "filterEndMs",   value: fEndEl   ? parseLocalMs(fEndEl.value)   : null }
     );
 
     // データを dataset に注入
